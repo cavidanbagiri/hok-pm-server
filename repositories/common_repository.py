@@ -20,7 +20,6 @@ class CheckAdminManagerAuthorize:
         query = select(UserModel).where(UserModel.id == self.user_id)
         result = await self.db.execute(query)
         user = result.scalar_one_or_none()
-        print(f'status  is ')
 
         if not user:
             raise HTTPException(404, "User not found")
@@ -182,3 +181,122 @@ class CreateStockRepository:
         await self.db_session.refresh(stock)
 
         return stock
+
+
+# repositories/common_repository.py (add these new classes)
+
+class FetchAreaRepository:
+
+    def __init__(self, db_session: AsyncSession, area_id: int = None, project_id: int = None):
+        self.db_session = db_session
+        self.area_id = area_id
+        self.project_id = project_id
+
+    async def fetch_area(self):
+        query = select(AreaModel)
+
+        if self.area_id:
+            query = query.where(AreaModel.id == self.area_id)
+
+        if self.project_id:
+            query = query.where(AreaModel.project_id == self.project_id)
+
+        result = await self.db_session.execute(query)
+        areas = result.scalars().all()
+
+        if not areas:
+            raise HTTPException(404, "Area not found")
+
+        return areas
+
+
+class FetchLocationRepository:
+
+    def __init__(self, db_session: AsyncSession, location_id: int = None, project_id: int = None):
+        self.db_session = db_session
+        self.location_id = location_id
+        self.project_id = project_id
+
+    async def fetch_location(self):
+        query = select(LocationModel)
+
+        if self.location_id:
+            query = query.where(LocationModel.id == self.location_id)
+
+        if self.project_id:
+            query = query.where(LocationModel.project_id == self.project_id)
+
+        result = await self.db_session.execute(query)
+        locations = result.scalars().all()
+
+        if not locations:
+            raise HTTPException(404, "Location not found")
+
+        return locations
+
+
+class FetchUomRepository:
+
+    def __init__(self, db_session: AsyncSession, uom_id: int = None):
+        self.db_session = db_session
+        self.uom_id = uom_id
+
+    async def fetch_uom(self):
+        query = select(UomModel)
+
+        if self.uom_id:
+            query = query.where(UomModel.id == self.uom_id)
+
+        result = await self.db_session.execute(query)
+        uoms = result.scalars().all()
+
+        if not uoms:
+            raise HTTPException(404, "UOM not found")
+
+        return uoms
+
+
+class FetchTypeRepository:
+
+    def __init__(self, db_session: AsyncSession, type_id: int = None):
+        self.db_session = db_session
+        self.type_id = type_id
+
+    async def fetch_type(self):
+        query = select(TypeModel)
+
+        if self.type_id:
+            query = query.where(TypeModel.id == self.type_id)
+
+        result = await self.db_session.execute(query)
+        types = result.scalars().all()
+
+        if not types:
+            raise HTTPException(404, "Type not found")
+
+        return types
+
+
+class FetchStockRepository:
+
+    def __init__(self, db_session: AsyncSession, stock_id: int = None, stock_code: str = None):
+        self.db_session = db_session
+        self.stock_id = stock_id
+        self.stock_code = stock_code
+
+    async def fetch_stock(self):
+        query = select(StockDataModel)
+
+        if self.stock_id:
+            query = query.where(StockDataModel.id == self.stock_id)
+
+        if self.stock_code:
+            query = query.where(StockDataModel.stock_code == self.stock_code)
+
+        result = await self.db_session.execute(query)
+        stocks = result.scalars().all()
+
+        if not stocks:
+            raise HTTPException(404, "Stock data not found")
+
+        return stocks

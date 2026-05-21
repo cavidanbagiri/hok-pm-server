@@ -13,7 +13,8 @@ from repositories.common_repository import (
     CreateLocationRepository,
     CreateUomRepository,
     CreateTypeRepository,
-    CreateStockRepository
+    CreateStockRepository, FetchAreaRepository, FetchLocationRepository, FetchUomRepository, FetchTypeRepository,
+    FetchStockRepository
 )
 
 router = APIRouter()
@@ -26,7 +27,6 @@ async def create_area(
         user_info: dict = Depends(TokenHandler.verify_access_token)
 ):
     try:
-        print('here work')
         user_id = user_info.get('sub')
         repo = CreateAreaRepository(db, data, int(user_id))
         result = await repo.create_area()
@@ -34,7 +34,6 @@ async def create_area(
     except HTTPException as ex:
         raise ex
     except Exception as ex:
-        print('ex is ', ex)
         raise HTTPException(500, f'Internal server error {ex}')
 
 
@@ -52,7 +51,6 @@ async def create_location(
     except HTTPException as ex:
         raise ex
     except Exception as ex:
-        print('ex is ', ex)
         raise HTTPException(500, f'Internal server error {ex}')
 
 
@@ -70,7 +68,6 @@ async def create_uom(
     except HTTPException as ex:
         raise ex
     except Exception as ex:
-        print('ex is ', ex)
         raise HTTPException(500, f'Internal server error {ex}')
 
 
@@ -88,7 +85,6 @@ async def create_type(
     except HTTPException as ex:
         raise ex
     except Exception as ex:
-        print('ex is ', ex)
         raise HTTPException(500, f'Internal server error {ex}')
 
 
@@ -103,6 +99,92 @@ async def create_stock(
         repo = CreateStockRepository(db, data, int(user_id))
         result = await repo.create_stock()
         return {"message": "Stock created successfully", "id": result.id, "stock_code": result.stock_code}
+    except HTTPException as ex:
+        raise ex
+    except Exception as ex:
+        raise HTTPException(500, f'Internal server error {ex}')
+
+
+
+
+# router/admin_router.py (add these fetch endpoints)
+
+@router.get("/fetch_area", status_code=200)
+async def fetch_area(
+        db: Annotated[AsyncSession, Depends(get_db)],
+        area_id: int = None,
+        project_id: int = None
+):
+    try:
+        repo = FetchAreaRepository(db, area_id, project_id)
+        result = await repo.fetch_area()
+        return {"data": result}
+    except HTTPException as ex:
+        raise ex
+    except Exception as ex:
+        print('ex is ', ex)
+        raise HTTPException(500, f'Internal server error {ex}')
+
+
+@router.get("/fetch_location", status_code=200)
+async def fetch_location(
+        db: Annotated[AsyncSession, Depends(get_db)],
+        location_id: int = None,
+        project_id: int = None
+):
+    try:
+        repo = FetchLocationRepository(db, location_id, project_id)
+        result = await repo.fetch_location()
+        return {"data": result}
+    except HTTPException as ex:
+        raise ex
+    except Exception as ex:
+        print('ex is ', ex)
+        raise HTTPException(500, f'Internal server error {ex}')
+
+
+@router.get("/fetch_uom", status_code=200)
+async def fetch_uom(
+        db: Annotated[AsyncSession, Depends(get_db)],
+        uom_id: int = None
+):
+    try:
+        repo = FetchUomRepository(db, uom_id)
+        result = await repo.fetch_uom()
+        return {"data": result}
+    except HTTPException as ex:
+        raise ex
+    except Exception as ex:
+        print('ex is ', ex)
+        raise HTTPException(500, f'Internal server error {ex}')
+
+
+@router.get("/fetch_type", status_code=200)
+async def fetch_type(
+        db: Annotated[AsyncSession, Depends(get_db)],
+        type_id: int = None
+):
+    try:
+        repo = FetchTypeRepository(db, type_id)
+        result = await repo.fetch_type()
+        return {"data": result}
+    except HTTPException as ex:
+        raise ex
+    except Exception as ex:
+        print('ex is ', ex)
+        raise HTTPException(500, f'Internal server error {ex}')
+
+
+@router.get("/fetch_stock_data", status_code=200)
+async def fetch_stock_data(
+        db: Annotated[AsyncSession, Depends(get_db)],
+        stock_id: int = None,
+        stock_code: str = None
+):
+    try:
+        repo = FetchStockRepository(db, stock_id, stock_code)
+        result = await repo.fetch_stock()
+        return {"data": result}
     except HTTPException as ex:
         raise ex
     except Exception as ex:
