@@ -346,7 +346,6 @@ async def fetch_material(
     except HTTPException as ex:
         raise ex
     except Exception as ex:
-        print('ex is ', ex)
         raise HTTPException(500, f'Internal server error {ex}')
 
 
@@ -362,7 +361,6 @@ async def fetch_description(
     except HTTPException as ex:
         raise ex
     except Exception as ex:
-        print('ex is ', ex)
         raise HTTPException(500, f'Internal server error {ex}')
 
 
@@ -378,5 +376,4 @@ async def fetch_type(
     except HTTPException as ex:
         raise ex
     except Exception as ex:
-        print('ex is ', ex)
         raise HTTPException(500, f'Internal server error {ex}')

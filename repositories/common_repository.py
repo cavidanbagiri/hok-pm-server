@@ -371,6 +371,54 @@ class CreateUomRepository:
         return uom
 
 
+# class CreateStockRepository:
+#
+#     def __init__(self, db_session: AsyncSession, data: CreateStockSchema, user_id: int):
+#         self.db_session = db_session
+#         self.data = data
+#         self.user_id = user_id
+#
+#     async def create_stock(self):
+#         await CheckAdminManagerAuthorize(self.db_session, self.user_id).check_admin_or_manager()
+#
+#         # Check if type exists
+#         type_obj = await self.db_session.execute(
+#             select(TypeModel).where(TypeModel.id == self.data.type_id)
+#         )
+#         if not type_obj.scalar_one_or_none():
+#             raise HTTPException(404, "Type not found")
+#
+#         # Check if UOM exists
+#         uom_obj = await self.db_session.execute(
+#             select(UomModel).where(UomModel.id == self.data.uom_id)
+#         )
+#         if not uom_obj.scalar_one_or_none():
+#             raise HTTPException(404, "UOM not found")
+#
+#         # Check if stock code already exists
+#         existing = await self.db_session.execute(
+#             select(StockDataModel).where(StockDataModel.stock_code == self.data.stock_code)
+#         )
+#         if existing.scalar_one_or_none():
+#             raise HTTPException(409, "Stock code already exists")
+#
+#         stock = StockDataModel(
+#             stock_code=self.data.stock_code,
+#             alternative_id=self.data.alternative_id,
+#             old_code=self.data.old_code,
+#             comment=self.data.comment,
+#             type_id=self.data.type_id,
+#             uom_id=self.data.uom_id
+#         )
+#
+#         self.db_session.add(stock)
+#         await self.db_session.commit()
+#         await self.db_session.refresh(stock)
+#
+#         return stock
+
+
+
 class CreateStockRepository:
 
     def __init__(self, db_session: AsyncSession, data: CreateStockSchema, user_id: int):
@@ -379,6 +427,7 @@ class CreateStockRepository:
         self.user_id = user_id
 
     async def create_stock(self):
+        # Add await here
         await CheckAdminManagerAuthorize(self.db_session, self.user_id).check_admin_or_manager()
 
         # Check if type exists

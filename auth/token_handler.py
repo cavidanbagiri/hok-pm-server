@@ -36,7 +36,6 @@ class TokenHandler:
 
     @staticmethod
     def verify_access_token(req: Request) -> dict:
-        print(f"{req.headers.get('Authorization')}")
         if req.headers.get('Authorization'):
             access_token = req.headers.get('Authorization').split(' ')[1]
 
