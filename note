@@ -2,19 +2,122 @@
 Can we write a new alembic version for adding this new columns please?
 
 
+# schemas/common_schema.py
 
-#models/user_model.py
+from pydantic import BaseModel
 
-class ProjectModel(Base):
-    __tablename__ = "project"
-    id = Column(Integer, primary_key=True)
-    name = Column(String, nullable=False)
-    country = Column(String, nullable=False) # new added
-    code = Column(String, nullable=False) # new added
+class CreateAreaSchema(BaseModel):
+    name: str
+    description: str
+    project_id: int
+
+class CreateLocationSchema(BaseModel):
+    name: str
+    project_id: int
+
+class CreateUomSchema(BaseModel):
+    name: str
 
 
-{
-"name":"Izmir Aliaga",
-"country":"Turkiye",
-"code":"TR.25"
-}
+class CreateTypeSchema(BaseModel):
+    name: str
+    sub_name: str
+    description: str
+    material: str
+    size_1: str
+    size_2: str
+    thickness_1: str
+    thickness_2: str
+
+class CreateStockSchema(BaseModel):
+    stock_code: str
+    alternative_id: str
+    old_code: str
+    comment: str
+    type_id: str
+    uom_id: str
+
+
+#router.py
+# router/admin_router.py
+from fastapi import APIRouter, Depends, Response, HTTPException, Request
+from typing import Annotated
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from auth.token_handler import TokenHandler
+from database.setup import get_db
+
+from schemas.common_schema import *
+
+from repositories.common_repository import CreateAreaRepository
+
+router = APIRouter()
+
+@router.post("/create_area", status_code=201)
+async def create_area(
+        data: CreateAreaRepository,
+        db: AsyncSession = Depends(get_db),
+user_info: dict = Depends(TokenHandler.verify_access_token)
+):
+    try:
+        pass
+    except HTTPException as ex:
+        raise ex
+    except Exception as ex:
+        raise HTTPException(500, f'Internal server error {ex}')
+
+
+#repositories/common_repository.py
+
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from fastapi import HTTPException
+
+from models.user_model import UserModel, StatusModel
+
+
+class CheckAdminManagerAuthorize:
+
+    def __init__(self, db: AsyncSession, user_id: int):
+        self.db = db
+        self.user_id = user_id
+
+    async def check_admin_or_manager(self):
+        """
+        Get user by user id and check if "Admin" or "Manager"
+        continue
+        :return:
+        """
+        # Get user with status relationship
+        query = select(UserModel).where(UserModel.id == self.user_id)
+        result = await self.db.execute(query)
+        user = result.scalar_one_or_none()
+
+        if not user:
+            raise HTTPException(404, "User not found")
+
+        # Get status name (assuming status table has 'admin' and 'manager' entries)
+        status_query = select(StatusModel).where(StatusModel.id == user.status_id)
+        status_result = await self.db.execute(status_query)
+        status = status_result.scalar_one_or_none()
+
+        if not status:
+            raise HTTPException(404, "Status not found")
+
+        if status.status.lower() not in ["admin", "manager"]:
+            raise HTTPException(403, "Authorization Error. Please write to admin")
+
+        return user
+
+
+
+class CreateAreaRepository:
+
+    def __init__(self, db_session, data, user_id):
+        self.db_session = db_session
+        self.data = data
+        self.user_id = user_id
+
+    async def create_area(self):
+        pass
+

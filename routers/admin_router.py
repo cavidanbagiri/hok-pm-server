@@ -16,7 +16,6 @@ async def create_project(
         db_session: Annotated[AsyncSession, Depends(get_db)],
         user_info: dict = Depends(TokenHandler.verify_access_token),
 ):
-    print('here working')
     try:
         # Extract user_id from token payload (assuming 'sub' contains user_id)
         user_id = user_info.get('sub')
@@ -28,8 +27,6 @@ async def create_project(
         return {"message": "Project created successfully", "project_id": project.id, "name": project.name}
 
     except HTTPException as ex:
-        print('ex is ', ex)
         raise ex
     except Exception as ex:
-        print('ex is ', ex)
         raise HTTPException(500, f'Internal server error {ex}')

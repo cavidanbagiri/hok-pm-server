@@ -135,7 +135,8 @@ class UserRegisterRepository:
                 'lastname': user.lastname,
                 'username': user.firstname + ' ' + user.lastname,
                 'email': user.email,
-                'status': user.status
+                'status_id': user.status_id,  # Changed from 'status' to 'status_id'
+                'project_id': user.project_id  # Changed from 'status' to 'status_id'
             },
             'access_token': access_token,
             'refresh_token': refresh_token
@@ -190,7 +191,8 @@ class UserLoginRepository:
                 'lastname': user.lastname,
                 'username': user.firstname + ' ' + user.lastname,
                 'email': user.email,
-                'status': user.status.status  # Now this is already loaded
+                'status_id': user.status_id,  # Changed from 'status' to 'status_id'
+                'project_id': user.project_id  # Changed from 'status' to 'status_id'
             },
             'access_token': access_token,
             'refresh_token': refresh_token
@@ -216,7 +218,8 @@ class UserLoginRepository:
                 'lastname': user.lastname,
                 'username': user.firstname + ' ' + user.lastname,
                 'email': user.email,
-                'status': user.status
+                'status_id': user.status_id,  # Changed from 'status' to 'status_id'
+                'project_id': user.project_id  # Changed from 'status' to 'status_id'
             }
 
 
