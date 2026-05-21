@@ -16,7 +16,8 @@ from repositories.common_repository import (
     CreateStockRepository, FetchAreaRepository, FetchLocationRepository, FetchUomRepository, FetchTypeRepository,
     FetchStockRepository, CreateDescriptionRepository, CreateMaterialRepository, CreateSize2Repository,
     CreateSize1Repository, CreateSubTypeRepository, FetchSubTypeRepository, FetchSize1Repository, FetchSize2Repository,
-    FetchMaterialRepository, FetchDescriptionRepository
+    FetchMaterialRepository, FetchDescriptionRepository, FetchTypesRepository, CreateTypesRepository,
+    BulkCreateSubTypeRepository, BulkCreateSize1Repository, BulkCreateSize2Repository, BulkCreateMaterialRepository
 )
 
 router = APIRouter()
@@ -158,21 +159,21 @@ async def create_uom(
         raise HTTPException(500, f'Internal server error {ex}')
 
 
-@router.post("/create_type", status_code=201)
-async def create_type(
-        data: CreateTypeSchema,
-        db: Annotated[AsyncSession, Depends(get_db)],
-        user_info: dict = Depends(TokenHandler.verify_access_token)
-):
-    try:
-        user_id = user_info.get('sub')
-        repo = CreateTypeRepository(db, data, int(user_id))
-        result = await repo.create_type()
-        return {"message": "Type created successfully", "id": result.id}
-    except HTTPException as ex:
-        raise ex
-    except Exception as ex:
-        raise HTTPException(500, f'Internal server error {ex}')
+# @router.post("/create_type", status_code=201)
+# async def create_type(
+#         data: CreateTypeSchema,
+#         db: Annotated[AsyncSession, Depends(get_db)],
+#         user_info: dict = Depends(TokenHandler.verify_access_token)
+# ):
+#     try:
+#         user_id = user_info.get('sub')
+#         repo = CreateTypeRepository(db, data, int(user_id))
+#         result = await repo.create_type()
+#         return {"message": "Type created successfully", "id": result.id}
+#     except HTTPException as ex:
+#         raise ex
+#     except Exception as ex:
+#         raise HTTPException(500, f'Internal server error {ex}')
 
 
 @router.post("/create_stock", status_code=201)
@@ -211,6 +212,26 @@ async def create_subtype(
         raise HTTPException(500, f'Internal server error {ex}')
 
 
+
+@router.post("/bulk_create_subtype", status_code=201)
+async def bulk_create_subtype(
+        data: BulkCreateSubTypeSchema,
+        db: Annotated[AsyncSession, Depends(get_db)],
+        user_info: dict = Depends(TokenHandler.verify_access_token)
+):
+    try:
+        user_id = user_info.get('sub')
+        repo = BulkCreateSubTypeRepository(db, data, int(user_id))
+        result = await repo.bulk_create_subtype()
+        return result
+    except HTTPException as ex:
+        raise ex
+    except Exception as ex:
+        print('ex is ', ex)
+        raise HTTPException(500, f'Internal server error {ex}')
+
+
+
 @router.post("/create_size1", status_code=201)
 async def create_size1(
         data: CreateSize1Schema,
@@ -222,6 +243,26 @@ async def create_size1(
         repo = CreateSize1Repository(db, data, int(user_id))
         result = await repo.create_size1()
         return {"message": "Size1 created successfully", "id": result.id, "name": result.name}
+    except HTTPException as ex:
+        raise ex
+    except Exception as ex:
+        print('ex is ', ex)
+        raise HTTPException(500, f'Internal server error {ex}')
+
+
+# router/admin_router.py (add this endpoint)
+
+@router.post("/bulk_create_size1", status_code=201)
+async def bulk_create_size1(
+        data: BulkCreateSize1Schema,
+        db: Annotated[AsyncSession, Depends(get_db)],
+        user_info: dict = Depends(TokenHandler.verify_access_token)
+):
+    try:
+        user_id = user_info.get('sub')
+        repo = BulkCreateSize1Repository(db, data, int(user_id))
+        result = await repo.bulk_create_size1()
+        return result
     except HTTPException as ex:
         raise ex
     except Exception as ex:
@@ -247,6 +288,26 @@ async def create_size2(
         raise HTTPException(500, f'Internal server error {ex}')
 
 
+# router/admin_router.py (add this endpoint)
+
+@router.post("/bulk_create_size2", status_code=201)
+async def bulk_create_size2(
+        data: BulkCreateSize2Schema,
+        db: Annotated[AsyncSession, Depends(get_db)],
+        user_info: dict = Depends(TokenHandler.verify_access_token)
+):
+    try:
+        user_id = user_info.get('sub')
+        repo = BulkCreateSize2Repository(db, data, int(user_id))
+        result = await repo.bulk_create_size2()
+        return result
+    except HTTPException as ex:
+        raise ex
+    except Exception as ex:
+        print('ex is ', ex)
+        raise HTTPException(500, f'Internal server error {ex}')
+
+
 @router.post("/create_material", status_code=201)
 async def create_material(
         data: CreateMaterialSchema,
@@ -258,6 +319,26 @@ async def create_material(
         repo = CreateMaterialRepository(db, data, int(user_id))
         result = await repo.create_material()
         return {"message": "Material created successfully", "id": result.id, "name": result.name}
+    except HTTPException as ex:
+        raise ex
+    except Exception as ex:
+        print('ex is ', ex)
+        raise HTTPException(500, f'Internal server error {ex}')
+
+
+# router/admin_router.py (add this endpoint)
+
+@router.post("/bulk_create_material", status_code=201)
+async def bulk_create_material(
+        data: BulkCreateMaterialSchema,
+        db: Annotated[AsyncSession, Depends(get_db)],
+        user_info: dict = Depends(TokenHandler.verify_access_token)
+):
+    try:
+        user_id = user_info.get('sub')
+        repo = BulkCreateMaterialRepository(db, data, int(user_id))
+        result = await repo.bulk_create_material()
+        return result
     except HTTPException as ex:
         raise ex
     except Exception as ex:
@@ -364,16 +445,88 @@ async def fetch_description(
         raise HTTPException(500, f'Internal server error {ex}')
 
 
+# @router.get("/fetch_type", status_code=200)
+# async def fetch_type(
+#         db: Annotated[AsyncSession, Depends(get_db)],
+#         type_id: int = None
+# ):
+#     try:
+#         repo = FetchTypeRepository(db, type_id)
+#         result = await repo.fetch_type()
+#         return {"data": result}
+#     except HTTPException as ex:
+#         raise ex
+#     except Exception as ex:
+#         raise HTTPException(500, f'Internal server error {ex}')
+#
+
+
+# router/admin_router.py (add these new endpoints)
+
+@router.post("/create_types", status_code=201)
+async def create_types(
+        data: CreateTypesSchema,
+        db: Annotated[AsyncSession, Depends(get_db)],
+        user_info: dict = Depends(TokenHandler.verify_access_token)
+):
+    try:
+        user_id = user_info.get('sub')
+        repo = CreateTypesRepository(db, data, int(user_id))
+        result = await repo.create_types()
+        return {"message": "Types created successfully", "id": result.id, "name": result.name}
+    except HTTPException as ex:
+        raise ex
+    except Exception as ex:
+        print('ex is ', ex)
+        raise HTTPException(500, f'Internal server error {ex}')
+
+
+@router.get("/fetch_types", status_code=200)
+async def fetch_types(
+        db: Annotated[AsyncSession, Depends(get_db)],
+        types_id: int = None
+):
+    try:
+        repo = FetchTypesRepository(db, types_id)
+        result = await repo.fetch_types()
+        return {"data": result}
+    except HTTPException as ex:
+        raise ex
+    except Exception as ex:
+        print('ex is ', ex)
+        raise HTTPException(500, f'Internal server error {ex}')
+
+
+@router.post("/create_type", status_code=201)
+async def create_type(
+        data: CreateTypeSchema,
+        db: Annotated[AsyncSession, Depends(get_db)],
+        user_info: dict = Depends(TokenHandler.verify_access_token)
+):
+    try:
+        user_id = user_info.get('sub')
+        repo = CreateTypeRepository(db, data, int(user_id))
+        result = await repo.create_type()
+        return {"message": "Type created successfully", "id": result.id}
+    except HTTPException as ex:
+        raise ex
+    except Exception as ex:
+        print('ex is ', ex)
+        raise HTTPException(500, f'Internal server error {ex}')
+
+
 @router.get("/fetch_type", status_code=200)
 async def fetch_type(
         db: Annotated[AsyncSession, Depends(get_db)],
-        type_id: int = None
+        type_id: int = None,
+        types_id: int = None
 ):
     try:
-        repo = FetchTypeRepository(db, type_id)
+        repo = FetchTypeRepository(db, type_id, types_id)
         result = await repo.fetch_type()
         return {"data": result}
     except HTTPException as ex:
         raise ex
     except Exception as ex:
+        print('ex is ', ex)
         raise HTTPException(500, f'Internal server error {ex}')

@@ -38,8 +38,6 @@ class TokenHandler:
     def verify_access_token(req: Request) -> dict:
         if req.headers.get('Authorization'):
             access_token = req.headers.get('Authorization').split(' ')[1]
-
-            print(f"access token is {access_token}")
             if access_token:
                 try:
                     secret_key = os.getenv('JWT_SECRET_KEY')

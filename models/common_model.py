@@ -93,10 +93,16 @@ class DescriptionModel(Base):
     def __str__(self):
         return self.name
 
+class TypesModel(Base):
+    __tablename__ = "types"
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False, unique=True)
+
 
 class TypeModel(Base):
     __tablename__ = "type"
     id = Column(Integer, primary_key=True)
+    type_id = Column(Integer, ForeignKey("types.id"), nullable=False) # new added
     subtype_id = Column(Integer, ForeignKey("subtype.id"), nullable=False)
     size1_id = Column(Integer, ForeignKey("size_1.id"), nullable=False)
     size2_id = Column(Integer, ForeignKey("size_2.id"), nullable=True)
@@ -106,6 +112,7 @@ class TypeModel(Base):
     thickness_2 = Column(String, nullable=True)
 
     # Relationships
+    type = relationship("TypesModel") #new added
     subtype = relationship("SubTypeModel")
     size1 = relationship("Size1Model")
     size2 = relationship("Size2Model")

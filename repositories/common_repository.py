@@ -1,16 +1,17 @@
 from fastapi import HTTPException
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 from models.user_model import UserModel, StatusModel
 from models.common_model import AreaModel, LocationModel, UomModel, TypeModel, StockDataModel, SubTypeModel, Size1Model, \
-    DescriptionModel, MaterialModel, Size2Model
+    DescriptionModel, MaterialModel, Size2Model, TypesModel
 
 from schemas.common_schema import CreateStockSchema, CreateTypeSchema, CreateUomSchema, CreateLocationSchema, \
     CreateAreaSchema, CreateDescriptionSchema, CreateSize2Schema, CreateSize1Schema, CreateMaterialSchema, \
-    CreateSubTypeSchema
+    CreateSubTypeSchema, CreateTypesSchema, BulkCreateSubTypeSchema, BulkCreateSize1Schema, BulkCreateSize2Schema, \
+    BulkCreateMaterialSchema
 
 
 class CheckAdminManagerAuthorize:
@@ -112,27 +113,6 @@ class FetchUomRepository:
         return uoms
 
 
-# class FetchTypeRepository:
-#
-#     def __init__(self, db_session: AsyncSession, type_id: int = None):
-#         self.db_session = db_session
-#         self.type_id = type_id
-#
-#     async def fetch_type(self):
-#         query = select(TypeModel)
-#
-#         if self.type_id:
-#             query = query.where(TypeModel.id == self.type_id)
-#
-#         result = await self.db_session.execute(query)
-#         types = result.scalars().all()
-#
-#         if not types:
-#             raise HTTPException(404, "Type not found")
-#
-#         return types
-
-
 class FetchStockRepository:
 
     def __init__(self, db_session: AsyncSession, stock_id: int = None, stock_code: str = None):
@@ -156,7 +136,6 @@ class FetchStockRepository:
             raise HTTPException(404, "Stock data not found")
 
         return stocks
-
 
 
 class FetchSubTypeRepository:
@@ -266,12 +245,14 @@ class FetchDescriptionRepository:
 
 class FetchTypeRepository:
 
-    def __init__(self, db_session: AsyncSession, type_id: int = None):
+    def __init__(self, db_session: AsyncSession, type_id: int = None, types_id: int = None):
         self.db_session = db_session
         self.type_id = type_id
+        self.types_id = types_id
 
     async def fetch_type(self):
         query = select(TypeModel).options(
+            selectinload(TypeModel.type),
             selectinload(TypeModel.subtype),
             selectinload(TypeModel.size1),
             selectinload(TypeModel.size2),
@@ -281,6 +262,9 @@ class FetchTypeRepository:
 
         if self.type_id:
             query = query.where(TypeModel.id == self.type_id)
+
+        if self.types_id:
+            query = query.where(TypeModel.type_id == self.types_id)
 
         result = await self.db_session.execute(query)
         types = result.scalars().all()
@@ -292,8 +276,97 @@ class FetchTypeRepository:
 
 
 
+# repositories/common_repository.py (add these new repositories)
 
 
+class CreateTypesRepository:
+
+    def __init__(self, db_session: AsyncSession, data: CreateTypesSchema, user_id: int):
+        self.db_session = db_session
+        self.data = data
+        self.user_id = user_id
+
+    async def create_types(self):
+        await CheckAdminManagerAuthorize(self.db_session, self.user_id).check_admin_or_manager()
+
+        # Использование func.upper для стороны SQL-запроса
+        existing = await self.db_session.execute(
+            select(TypesModel).where(func.upper(TypesModel.name) == self.data.name.upper())
+        )
+        if existing.scalar_one_or_none():
+            raise HTTPException(409, "Types already exists")
+
+        types = TypesModel(name=self.data.name.upper())
+        self.db_session.add(types)
+        await self.db_session.commit()
+        await self.db_session.refresh(types)
+        return types
+
+
+
+class FetchTypesRepository:
+
+    def __init__(self, db_session: AsyncSession, types_id: int = None):
+        self.db_session = db_session
+        self.types_id = types_id
+
+    async def fetch_types(self):
+        query = select(TypesModel)
+
+        if self.types_id:
+            query = query.where(TypesModel.id == self.types_id)
+
+        result = await self.db_session.execute(query)
+        types = result.scalars().all()
+
+        if not types:
+            raise HTTPException(404, "Types not found")
+
+        return types
+
+
+class CreateTypeRepository:
+
+    def __init__(self, db_session: AsyncSession, data: CreateTypeSchema, user_id: int):
+        self.db_session = db_session
+        self.data = data
+        self.user_id = user_id
+
+    async def create_type(self):
+        await CheckAdminManagerAuthorize(self.db_session, self.user_id).check_admin_or_manager()
+
+        # Verify all foreign keys exist
+        for model, id_field in [
+            (TypesModel, self.data.type_id),
+            (SubTypeModel, self.data.subtype_id),
+            (Size1Model, self.data.size1_id),
+            (MaterialModel, self.data.material_id),
+            (DescriptionModel, self.data.description_id)
+        ]:
+            result = await self.db_session.execute(select(model).where(model.id == id_field))
+            if not result.scalar_one_or_none():
+                raise HTTPException(404, f"{model.__name__} not found")
+
+        if self.data.size2_id:
+            result = await self.db_session.execute(select(Size2Model).where(Size2Model.id == self.data.size2_id))
+            if not result.scalar_one_or_none():
+                raise HTTPException(404, "Size2 not found")
+
+        type_obj = TypeModel(
+            type_id=self.data.type_id,
+            subtype_id=self.data.subtype_id,
+            size1_id=self.data.size1_id,
+            size2_id=self.data.size2_id,
+            material_id=self.data.material_id,
+            description_id=self.data.description_id,
+            thickness_1=self.data.thickness_1,
+            thickness_2=self.data.thickness_2
+        )
+
+        self.db_session.add(type_obj)
+        await self.db_session.commit()
+        await self.db_session.refresh(type_obj)
+        return type_obj
 
 
 
@@ -371,54 +444,6 @@ class CreateUomRepository:
         return uom
 
 
-# class CreateStockRepository:
-#
-#     def __init__(self, db_session: AsyncSession, data: CreateStockSchema, user_id: int):
-#         self.db_session = db_session
-#         self.data = data
-#         self.user_id = user_id
-#
-#     async def create_stock(self):
-#         await CheckAdminManagerAuthorize(self.db_session, self.user_id).check_admin_or_manager()
-#
-#         # Check if type exists
-#         type_obj = await self.db_session.execute(
-#             select(TypeModel).where(TypeModel.id == self.data.type_id)
-#         )
-#         if not type_obj.scalar_one_or_none():
-#             raise HTTPException(404, "Type not found")
-#
-#         # Check if UOM exists
-#         uom_obj = await self.db_session.execute(
-#             select(UomModel).where(UomModel.id == self.data.uom_id)
-#         )
-#         if not uom_obj.scalar_one_or_none():
-#             raise HTTPException(404, "UOM not found")
-#
-#         # Check if stock code already exists
-#         existing = await self.db_session.execute(
-#             select(StockDataModel).where(StockDataModel.stock_code == self.data.stock_code)
-#         )
-#         if existing.scalar_one_or_none():
-#             raise HTTPException(409, "Stock code already exists")
-#
-#         stock = StockDataModel(
-#             stock_code=self.data.stock_code,
-#             alternative_id=self.data.alternative_id,
-#             old_code=self.data.old_code,
-#             comment=self.data.comment,
-#             type_id=self.data.type_id,
-#             uom_id=self.data.uom_id
-#         )
-#
-#         self.db_session.add(stock)
-#         await self.db_session.commit()
-#         await self.db_session.refresh(stock)
-#
-#         return stock
-
-
-
 class CreateStockRepository:
 
     def __init__(self, db_session: AsyncSession, data: CreateStockSchema, user_id: int):
@@ -490,6 +515,58 @@ class CreateSubTypeRepository:
         return subtype
 
 
+class BulkCreateSubTypeRepository:
+
+    def __init__(self, db_session: AsyncSession, data: BulkCreateSubTypeSchema, user_id: int):
+        self.db_session = db_session
+        self.data = data
+        self.user_id = user_id
+
+    async def bulk_create_subtype(self):
+        await CheckAdminManagerAuthorize(self.db_session, self.user_id).check_admin_or_manager()
+
+        created_items = []
+        failed_items = []
+
+        for item in self.data.items:
+            try:
+                # Convert to uppercase
+                name_upper = item.name.upper()
+
+                # Check if exists
+                existing = await self.db_session.execute(
+                    select(SubTypeModel).where(SubTypeModel.name == name_upper)
+                )
+                if existing.scalar_one_or_none():
+                    failed_items.append({"name": item.name, "error": "Already exists"})
+                    continue
+
+                subtype = SubTypeModel(name=name_upper)
+                self.db_session.add(subtype)
+                created_items.append({"id": None, "name": item.name})
+
+            except Exception as e:
+                failed_items.append({"name": item.name, "error": str(e)})
+
+        # Commit all at once
+        if created_items:
+            await self.db_session.commit()
+            # Refresh to get IDs
+            for item in created_items:
+                result = await self.db_session.execute(
+                    select(SubTypeModel).where(SubTypeModel.name == item["name"].upper())
+                )
+                subtype = result.scalar_one_or_none()
+                item["id"] = subtype.id
+
+        return {
+            "success": created_items,
+            "failed": failed_items,
+            "total_created": len(created_items),
+            "total_failed": len(failed_items)
+        }
+
+
 class CreateSize1Repository:
 
     def __init__(self, db_session: AsyncSession, data: CreateSize1Schema, user_id: int):
@@ -513,6 +590,58 @@ class CreateSize1Repository:
         return size1
 
 
+class BulkCreateSize1Repository:
+
+    def __init__(self, db_session: AsyncSession, data: BulkCreateSize1Schema, user_id: int):
+        self.db_session = db_session
+        self.data = data
+        self.user_id = user_id
+
+    async def bulk_create_size1(self):
+        await CheckAdminManagerAuthorize(self.db_session, self.user_id).check_admin_or_manager()
+
+        created_items = []
+        failed_items = []
+
+        for item in self.data.items:
+            try:
+                # Convert to uppercase
+                name_upper = item.name.upper()
+
+                # Check if exists
+                existing = await self.db_session.execute(
+                    select(Size1Model).where(Size1Model.name == name_upper)
+                )
+                if existing.scalar_one_or_none():
+                    failed_items.append({"name": item.name, "error": "Already exists"})
+                    continue
+
+                size1 = Size1Model(name=name_upper)
+                self.db_session.add(size1)
+                created_items.append({"id": None, "name": item.name})
+
+            except Exception as e:
+                failed_items.append({"name": item.name, "error": str(e)})
+
+        # Commit all at once
+        if created_items:
+            await self.db_session.commit()
+            # Refresh to get IDs
+            for item in created_items:
+                result = await self.db_session.execute(
+                    select(Size1Model).where(Size1Model.name == item["name"].upper())
+                )
+                size1 = result.scalar_one_or_none()
+                item["id"] = size1.id
+
+        return {
+            "success": created_items,
+            "failed": failed_items,
+            "total_created": len(created_items),
+            "total_failed": len(failed_items)
+        }
+
+
 class CreateSize2Repository:
 
     def __init__(self, db_session: AsyncSession, data: CreateSize2Schema, user_id: int):
@@ -534,6 +663,59 @@ class CreateSize2Repository:
         await self.db_session.commit()
         await self.db_session.refresh(size2)
         return size2
+
+# repositories/common_repository.py (add this class)
+
+class BulkCreateSize2Repository:
+
+    def __init__(self, db_session: AsyncSession, data: BulkCreateSize2Schema, user_id: int):
+        self.db_session = db_session
+        self.data = data
+        self.user_id = user_id
+
+    async def bulk_create_size2(self):
+        await CheckAdminManagerAuthorize(self.db_session, self.user_id).check_admin_or_manager()
+
+        created_items = []
+        failed_items = []
+
+        for item in self.data.items:
+            try:
+                # Convert to uppercase
+                name_upper = item.name.upper()
+
+                # Check if exists
+                existing = await self.db_session.execute(
+                    select(Size2Model).where(Size2Model.name == name_upper)
+                )
+                if existing.scalar_one_or_none():
+                    failed_items.append({"name": item.name, "error": "Already exists"})
+                    continue
+
+                size2 = Size2Model(name=name_upper)
+                self.db_session.add(size2)
+                created_items.append({"id": None, "name": item.name})
+
+            except Exception as e:
+                failed_items.append({"name": item.name, "error": str(e)})
+
+        # Commit all at once
+        if created_items:
+            await self.db_session.commit()
+            # Refresh to get IDs
+            for item in created_items:
+                result = await self.db_session.execute(
+                    select(Size2Model).where(Size2Model.name == item["name"].upper())
+                )
+                size2 = result.scalar_one_or_none()
+                item["id"] = size2.id
+
+        return {
+            "success": created_items,
+            "failed": failed_items,
+            "total_created": len(created_items),
+            "total_failed": len(failed_items)
+        }
 
 
 class CreateMaterialRepository:
@@ -559,6 +741,59 @@ class CreateMaterialRepository:
         return material
 
 
+# repositories/common_repository.py (add this class)
+
+class BulkCreateMaterialRepository:
+
+    def __init__(self, db_session: AsyncSession, data: BulkCreateMaterialSchema, user_id: int):
+        self.db_session = db_session
+        self.data = data
+        self.user_id = user_id
+
+    async def bulk_create_material(self):
+        await CheckAdminManagerAuthorize(self.db_session, self.user_id).check_admin_or_manager()
+
+        created_items = []
+        failed_items = []
+
+        for item in self.data.items:
+            try:
+                # Convert to uppercase
+                name_upper = item.name.upper()
+
+                # Check if exists
+                existing = await self.db_session.execute(
+                    select(MaterialModel).where(MaterialModel.name == name_upper)
+                )
+                if existing.scalar_one_or_none():
+                    failed_items.append({"name": item.name, "error": "Already exists"})
+                    continue
+
+                material = MaterialModel(name=name_upper)
+                self.db_session.add(material)
+                created_items.append({"id": None, "name": item.name})
+
+            except Exception as e:
+                failed_items.append({"name": item.name, "error": str(e)})
+
+        # Commit all at once
+        if created_items:
+            await self.db_session.commit()
+            # Refresh to get IDs
+            for item in created_items:
+                result = await self.db_session.execute(
+                    select(MaterialModel).where(MaterialModel.name == item["name"].upper())
+                )
+                material = result.scalar_one_or_none()
+                item["id"] = material.id
+
+        return {
+            "success": created_items,
+            "failed": failed_items,
+            "total_created": len(created_items),
+            "total_failed": len(failed_items)
+        }
+
 class CreateDescriptionRepository:
 
     def __init__(self, db_session: AsyncSession, data: CreateDescriptionSchema, user_id: int):
@@ -580,46 +815,4 @@ class CreateDescriptionRepository:
         await self.db_session.commit()
         await self.db_session.refresh(description)
         return description
-
-
-class CreateTypeRepository:
-
-    def __init__(self, db_session: AsyncSession, data: CreateTypeSchema, user_id: int):
-        self.db_session = db_session
-        self.data = data
-        self.user_id = user_id
-
-    async def create_type(self):
-        await CheckAdminManagerAuthorize(self.db_session, self.user_id).check_admin_or_manager()
-
-        # Verify all foreign keys exist
-        for model, id_field in [
-            (SubTypeModel, self.data.subtype_id),
-            (Size1Model, self.data.size1_id),
-            (MaterialModel, self.data.material_id),
-            (DescriptionModel, self.data.description_id)
-        ]:
-            result = await self.db_session.execute(select(model).where(model.id == id_field))
-            if not result.scalar_one_or_none():
-                raise HTTPException(404, f"{model.__name__} not found")
-
-        if self.data.size2_id:
-            result = await self.db_session.execute(select(Size2Model).where(Size2Model.id == self.data.size2_id))
-            if not result.scalar_one_or_none():
-                raise HTTPException(404, "Size2 not found")
-
-        type_obj = TypeModel(
-            subtype_id=self.data.subtype_id,
-            size1_id=self.data.size1_id,
-            size2_id=self.data.size2_id,
-            material_id=self.data.material_id,
-            description_id=self.data.description_id,
-            thickness_1=self.data.thickness_1,
-            thickness_2=self.data.thickness_2
-        )
-
-        self.db_session.add(type_obj)
-        await self.db_session.commit()
-        await self.db_session.refresh(type_obj)
-        return type_obj
 

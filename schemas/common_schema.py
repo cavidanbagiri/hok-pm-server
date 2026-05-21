@@ -1,29 +1,49 @@
 # schemas/common_schema.py
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
 
 class CreateSubTypeSchema(BaseModel):
     name: str
 
+class BulkCreateSubTypeSchema(BaseModel):
+    items: List[CreateSubTypeSchema]
 
 class CreateSize1Schema(BaseModel):
     name: str
 
+# schemas/common_schema.py (add this)
+class BulkCreateSize1Schema(BaseModel):
+    items: List[CreateSize1Schema]
 
 class CreateSize2Schema(BaseModel):
     name: str
 
+# schemas/common_schema.py (add this)
+class BulkCreateSize2Schema(BaseModel):
+    items: List[CreateSize2Schema]
 
 class CreateMaterialSchema(BaseModel):
     name: str
 
+# schemas/common_schema.py (add this)
+class BulkCreateMaterialSchema(BaseModel):
+    items: List[CreateMaterialSchema]
 
 class CreateDescriptionSchema(BaseModel):
     name: str
 
 
+
+
+# schemas/common_schema.py (add these new schemas)
+
+class CreateTypesSchema(BaseModel):
+    name: str
+
+
 class CreateTypeSchema(BaseModel):
+    type_id: int  # Changed from subtype_id to type_id
     subtype_id: int
     size1_id: int
     size2_id: Optional[int] = None
@@ -31,6 +51,8 @@ class CreateTypeSchema(BaseModel):
     description_id: int
     thickness_1: Optional[str] = None
     thickness_2: Optional[str] = None
+
+
 
 
 class CreateAreaSchema(BaseModel):
