@@ -48,39 +48,39 @@ def upgrade():
     )
 
     # Create type table
-    op.create_table(
-        'type',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('name', sa.String(), nullable=False),
-        sa.Column('sub_name', sa.String(), nullable=False),
-        sa.Column('description', sa.String(), nullable=False),
-        sa.Column('material', sa.String(), nullable=False),
-        sa.Column('size_1', sa.String(), nullable=False),
-        sa.Column('size_2', sa.String(), nullable=True),
-        sa.Column('thickness_1', sa.String(), nullable=True),
-        sa.Column('thickness_2', sa.String(), nullable=True),
-        sa.PrimaryKeyConstraint('id')
-    )
+    # op.create_table(
+    #     'type',
+    #     sa.Column('id', sa.Integer(), nullable=False),
+    #     sa.Column('name', sa.String(), nullable=False),
+    #     sa.Column('sub_name', sa.String(), nullable=False),
+    #     sa.Column('description', sa.String(), nullable=False),
+    #     sa.Column('material', sa.String(), nullable=False),
+    #     sa.Column('size_1', sa.String(), nullable=False),
+    #     sa.Column('size_2', sa.String(), nullable=True),
+    #     sa.Column('thickness_1', sa.String(), nullable=True),
+    #     sa.Column('thickness_2', sa.String(), nullable=True),
+    #     sa.PrimaryKeyConstraint('id')
+    # )
 
-    # Create stock_data table
-    op.create_table(
-        'stock_data',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('stock_code', sa.String(), nullable=False),
-        sa.Column('alternative_id', sa.String(), nullable=True),
-        sa.Column('old_code', sa.String(), nullable=True),
-        sa.Column('comment', sa.String(), nullable=True),
-        sa.Column('type_id', sa.Integer(), nullable=False),
-        sa.Column('uom_id', sa.Integer(), nullable=False),
-        sa.ForeignKeyConstraint(['type_id'], ['type.id']),
-        sa.ForeignKeyConstraint(['uom_id'], ['uom.id']),
-        sa.PrimaryKeyConstraint('id')
-    )
+    # # Create stock_data table
+    # op.create_table(
+    #     'stock_data',
+    #     sa.Column('id', sa.Integer(), nullable=False),
+    #     sa.Column('stock_code', sa.String(), nullable=False),
+    #     sa.Column('alternative_id', sa.String(), nullable=True),
+    #     sa.Column('old_code', sa.String(), nullable=True),
+    #     sa.Column('comment', sa.String(), nullable=True),
+    #     sa.Column('type_id', sa.Integer(), nullable=False),
+    #     sa.Column('uom_id', sa.Integer(), nullable=False),
+    #     sa.ForeignKeyConstraint(['type_id'], ['type.id']),
+    #     sa.ForeignKeyConstraint(['uom_id'], ['uom.id']),
+    #     sa.PrimaryKeyConstraint('id')
+    # )
 
 
 def downgrade():
-    op.drop_table('stock_data')
-    op.drop_table('type')
+    # op.drop_table('stock_data')
+    # op.drop_table('type')
     op.drop_table('uom')
     op.drop_table('location')
     op.drop_table('area')
