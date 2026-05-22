@@ -58,6 +58,9 @@ class CreateTypeSchema(BaseModel):
 class CreateAreaSchema(BaseModel):
     name: str
     description: str
+    doc_no: str
+    doc_rev: str
+    say_iso_no: str
     project_id: int
 
 

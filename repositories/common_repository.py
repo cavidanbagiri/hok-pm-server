@@ -386,6 +386,9 @@ class CreateAreaRepository:
         area = AreaModel(
             name=self.data.name,
             description=self.data.description,
+            doc_no=self.data.doc_no,
+            doc_rev=self.data.doc_rev,
+            say_iso_no=self.data.say_iso_no,
             project_id=self.data.project_id
         )
 

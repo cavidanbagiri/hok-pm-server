@@ -1,0 +1,7 @@
+2026-05-22 11:39:31,814 - INFO - Started server process [36744]
+2026-05-22 11:39:31,824 - INFO - Waiting for application startup.
+2026-05-22 11:39:31,828 - INFO - Application startup complete.
+2026-05-22 11:39:48,042 - INFO - Shutting down
+2026-05-22 11:39:48,149 - INFO - Waiting for application shutdown.
+2026-05-22 11:39:48,152 - INFO - Application shutdown complete.
+2026-05-22 11:39:48,157 - INFO - Finished server process [36744]

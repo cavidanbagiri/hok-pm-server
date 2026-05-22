@@ -13,6 +13,12 @@ class AreaModel(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
     description = Column(String, nullable=False)
+
+    doc_no = Column(String, nullable=False) # new added
+    doc_rev = Column(String, nullable=False) # new added
+    say_iso_no = Column(String, nullable=False) # new added
+
+
     project_id = Column(Integer, ForeignKey("project.id"), nullable=False)
 
     def __str__(self) -> str:
@@ -47,6 +53,10 @@ class StockDataModel(Base):
     comment = Column(String, nullable=True)
     type_id = Column(Integer, ForeignKey("type.id"), nullable=False)
     uom_id = Column(Integer, ForeignKey("uom.id"), nullable=False)
+
+    type = relationship("TypeModel", backref="stock_datas")
+    uom = relationship("UomModel", backref="stock_datas")
+
 
 
 class SubTypeModel(Base):
@@ -118,3 +128,7 @@ class TypeModel(Base):
     size2 = relationship("Size2Model")
     material = relationship("MaterialModel")
     description = relationship("DescriptionModel")
+
+
+
+
