@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth.refresh_token_handler import DeleteRefreshTokenRepository
 from auth.token_handler import TokenHandler
-from models.user_model import UserModel, TokenModel
+from models.user_model import UserModel, TokenModel, StatusModel
 from schemas.auth_schemas import UserLoginSchema
 from utils.hash_password import PasswordHash
 
@@ -98,12 +98,6 @@ class UserRegisterRepository:
         if user:
             raise HTTPException(status_code=409, detail="Email already exists")
 
-        # Check username
-        # data = await self.db.execute(select(UserModel).where(UserModel.username == register_data.username))
-        # user = data.scalar()
-        # if user:
-        #     raise HTTPException(status_code=409, detail="Username already exists")
-
         # Hash password
         register_data.password = self.h_password.hash_password(register_data.password)
 
@@ -128,6 +122,12 @@ class UserRegisterRepository:
 
         await self.refresh_token_repo.save_refresh_token(user.id, refresh_token, access_token)
 
+        # After finding the user, fetch status text
+        status_result = await self.db.execute(
+            select(StatusModel.status).where(StatusModel.id == user.status_id)
+        )
+        status_text = status_result.scalar()
+
         return {
             'user': {
                 'id': user.id,
@@ -136,6 +136,7 @@ class UserRegisterRepository:
                 'username': user.firstname + ' ' + user.lastname,
                 'email': user.email,
                 'status_id': user.status_id,  # Changed from 'status' to 'status_id'
+                'status_text': status_text,
                 'project_id': user.project_id  # Changed from 'status' to 'status_id'
             },
             'access_token': access_token,
@@ -184,6 +185,12 @@ class UserLoginRepository:
 
         await self.refresh_token_repo.save_refresh_token(user.id, refresh_token, access_token)
 
+        # After finding the user, fetch status text
+        status_result = await self.db.execute(
+            select(StatusModel.status).where(StatusModel.id == user.status_id)
+        )
+        status_text = status_result.scalar()
+
         return {
             'user': {
                 'id': user.id,
@@ -192,6 +199,7 @@ class UserLoginRepository:
                 'username': user.firstname + ' ' + user.lastname,
                 'email': user.email,
                 'status_id': user.status_id,  # Changed from 'status' to 'status_id'
+                'status_text': status_text,
                 'project_id': user.project_id  # Changed from 'status' to 'status_id'
             },
             'access_token': access_token,
@@ -211,6 +219,12 @@ class UserLoginRepository:
             if not user:
                 raise HTTPException(status_code=404, detail="User not found")
 
+            # After finding the user, fetch status text
+            status_result = await db.execute(
+                select(StatusModel.status).where(StatusModel.id == user.status_id)
+            )
+            status_text = status_result.scalar()
+
             # Return user data in the same format as login method
             return {
                 'id': user.id,
@@ -219,6 +233,7 @@ class UserLoginRepository:
                 'username': user.firstname + ' ' + user.lastname,
                 'email': user.email,
                 'status_id': user.status_id,  # Changed from 'status' to 'status_id'
+                'status_text': status_text,
                 'project_id': user.project_id  # Changed from 'status' to 'status_id'
             }
 
