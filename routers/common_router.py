@@ -23,17 +23,18 @@ from repositories.common_repository import (
 
 router = APIRouter()
 
-
-########################################################################### Area Functions
+#
+# ########################################################################### Area Functions
 @router.get("/fetch_area", status_code=200)
 async def fetch_area(
         db: Annotated[AsyncSession, Depends(get_db)],
-        area_id: int = None,
-        project_id: int = None
+        user_info: dict = Depends(TokenHandler.verify_access_token),
+        project_id: int = None  # Optional filter for admin/manager
 ):
     try:
-        repo = FetchAreaRepository(db, area_id, project_id)
-        result = await repo.fetch_area()
+        user_id = int(user_info['sub'])
+        repo = FetchAreaRepository(db)
+        result = await repo.fetch_area(user_id, project_id=project_id)
         return {"data": result}
     except HTTPException as ex:
         raise ex
@@ -42,8 +43,6 @@ async def fetch_area(
             status_code=500,
             detail="Internal server error"
         )
-
-
 
 @router.post("/create_area", status_code=201)
 async def create_area(
@@ -71,12 +70,13 @@ async def create_area(
 @router.get("/fetch_location", status_code=200)
 async def fetch_location(
         db: Annotated[AsyncSession, Depends(get_db)],
-        location_id: int = None,
-        project_id: int = None
+        user_info: dict = Depends(TokenHandler.verify_access_token),
+        project_id: int = None  # Optional filter for admin/manager
 ):
     try:
-        repo = FetchLocationRepository(db, location_id, project_id)
-        result = await repo.fetch_location()
+        user_id = int(user_info['sub'])
+        repo = FetchLocationRepository(db)
+        result = await repo.fetch_location(user_id, project_id=project_id)
         return {"data": result}
     except HTTPException as ex:
         raise ex
@@ -526,30 +526,6 @@ async def create_type(
             status_code=500,
             detail="Internal server error"
         )
-
-
-# @router.get("/fetch_type", status_code=200)
-# async def fetch_type(
-#         db: Annotated[AsyncSession, Depends(get_db)],
-#         type_id: int = None,
-#         types_id: int = None
-# ):
-#     try:
-#         repo = FetchTypeRepository(db, type_id, types_id)
-#         result = await repo.fetch_type()
-#         return {"data": result}
-#     except HTTPException as ex:
-#         raise ex
-#     except Exception:
-#         raise HTTPException(
-#             status_code=500,
-#             detail="Internal server error"
-#         )
-
-
-
-
-
 
 
 

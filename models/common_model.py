@@ -40,6 +40,8 @@ class AreaModel(Base):
         index=True
     )
 
+    project = relationship("ProjectModel")
+
     __table_args__ = (
         UniqueConstraint("name", "project_id"),
     )
@@ -71,6 +73,8 @@ class LocationModel(Base):
         nullable=False,
         index=True
     )
+
+    project = relationship("ProjectModel")
 
     __table_args__ = (
         UniqueConstraint("name", "project_id"),

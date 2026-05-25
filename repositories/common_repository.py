@@ -50,31 +50,84 @@ class CheckAdminManagerAuthorize:
         return user
 
 
+class GetUserInformation:
+    def __init__(self, db: AsyncSession, user_id: int):
+        self.db = db
+        self.user_id = user_id
+
+    async def get_user_information(self):
+        try:
+            query = (
+                select(UserModel)
+                .options(selectinload(UserModel.status))
+                .where(UserModel.id == self.user_id)
+            )
+
+            result = await self.db.execute(query)
+            user = result.scalar_one_or_none()
+
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+
+            return {
+                'user_id': user.id,
+                'project_id': user.project_id,
+                'status_id': user.status_id,
+                'status': user.status.status if user.status else None,
+                'email': user.email,
+                'firstname': user.firstname,
+                'lastname': user.lastname
+            }
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error fetching user information: {str(e)}"
+            )
+
 
 ########################################################################### Area Classes tested
 class FetchAreaRepository:
-
-    def __init__(self, db_session: AsyncSession, area_id: int = None, project_id: int = None):
+    def __init__(self, db_session: AsyncSession):
         self.db_session = db_session
-        self.area_id = area_id
-        self.project_id = project_id
 
-    async def fetch_area(self):
-        query = select(AreaModel)
+    async def fetch_area(self, user_id: int, project_id: int = None):
+        """
+        Fetch areas based on user permissions
+        - Regular users: Only see their project's areas
+        - Admin (status_id=1) or Manager (status_id=2): See all areas
+        """
 
-        if self.area_id:
-            query = query.where(AreaModel.id == self.area_id)
+        # MUST await here - GetUserInformation is async
+        user_info = await GetUserInformation(self.db_session, user_id).get_user_information()
 
-        if self.project_id:
-            query = query.where(AreaModel.project_id == self.project_id)
+        # Build base query
+        # query = select(AreaModel)
+        query = (
+            select(AreaModel)
+            .options(selectinload(AreaModel.project))
+        )
 
+        # Check if user is Admin (status_id=1) or Manager (status_id=2)
+        is_admin_or_manager = user_info['status_id'] in [1, 2]
+
+        if not is_admin_or_manager:
+            # Regular user - filter by their project_id
+            query = query.where(AreaModel.project_id == user_info['project_id'])
+        else:
+            # Admin or Manager - apply additional filters if provided
+            if project_id:
+                query = query.where(AreaModel.project_id == project_id)
+
+
+        # Execute query - MUST use await
         result = await self.db_session.execute(query)
         areas = result.scalars().all()
 
-        if not areas:
-            raise HTTPException(404, "Area not found")
-
         return areas
+
 
 class CreateAreaRepository:
 
@@ -149,14 +202,25 @@ class FetchLocationRepository:
         self.location_id = location_id
         self.project_id = project_id
 
-    async def fetch_location(self):
-        query = select(LocationModel)
+    async def fetch_location(self,  user_id: int, area_id: int = None, project_id: int = None):
+        # MUST await here - GetUserInformation is async
+        user_info = await GetUserInformation(self.db_session, user_id).get_user_information()
 
-        if self.location_id:
-            query = query.where(LocationModel.id == self.location_id)
+        query = (
+            select(LocationModel)
+            .options(selectinload(LocationModel.project))
+        )
 
-        if self.project_id:
-            query = query.where(LocationModel.project_id == self.project_id)
+        # Check if user is Admin (status_id=1) or Manager (status_id=2)
+        is_admin_or_manager = user_info['status_id'] in [1, 2]
+
+        if not is_admin_or_manager:
+            # Regular user - filter by their project_id
+            query = query.where(LocationModel.project_id == user_info['project_id'])
+        else:
+            # Admin or Manager - apply additional filters if provided
+            if project_id:
+                query = query.where(LocationModel.project_id == project_id)
 
         result = await self.db_session.execute(query)
         locations = result.scalars().all()
