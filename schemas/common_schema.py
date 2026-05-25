@@ -1,5 +1,5 @@
 # schemas/common_schema.py
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from typing import Optional, List
 
 
@@ -34,6 +34,14 @@ class CreateDescriptionSchema(BaseModel):
     name: str
 
 
+class BulkCreateDescriptionSchema(BaseModel):
+    descriptions: List[CreateDescriptionSchema]
+
+    @validator('descriptions')
+    def validate_non_empty(cls, v):
+        if not v:
+            raise ValueError('Descriptions list cannot be empty')
+        return v
 
 
 # schemas/common_schema.py (add these new schemas)

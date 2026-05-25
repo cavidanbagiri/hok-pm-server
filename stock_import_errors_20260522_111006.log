@@ -1,7 +1,0 @@
-2026-05-22 11:10:06,347 - INFO - Started server process [22336]
-2026-05-22 11:10:06,360 - INFO - Waiting for application startup.
-2026-05-22 11:10:06,364 - INFO - Application startup complete.
-2026-05-22 11:11:33,349 - INFO - Shutting down
-2026-05-22 11:11:33,460 - INFO - Waiting for application shutdown.
-2026-05-22 11:11:33,465 - INFO - Application shutdown complete.
-2026-05-22 11:11:33,469 - INFO - Finished server process [22336]

@@ -6,58 +6,224 @@ from sqlalchemy.orm import relationship
 from db.base import Base
 
 
+
+
 class StatusModel(Base):
-    __tablename__ = "status"
+    __tablename__ = "statuses"
+
     id = Column(Integer, primary_key=True)
-    status = Column(String, nullable=False)
+
+    status = Column(String, nullable=False, unique=True)
 
     def __str__(self) -> str:
-        return self.status
+        return f"{self.status}"
 
+
+# =========================================================
+# PROJECT
+# =========================================================
 
 class ProjectModel(Base):
-    __tablename__ = "project"
-    id = Column(Integer, primary_key=True)
-    name = Column(String, nullable=False)
-    country = Column(String, nullable=False)
-    code = Column(String, nullable=False)
+    __tablename__ = "projects"
 
+    id = Column(Integer, primary_key=True)
+
+    name = Column(String, nullable=False, unique=True)
+    country = Column(String, nullable=False)
+    code = Column(String, nullable=False, unique=True)
+
+    def __str__(self) -> str:
+        return f"{self.name} {self.country} {self.code}"
+
+
+# =========================================================
+# IMAGE
+# =========================================================
 
 class ImageModel(Base):
     __tablename__ = "images"
+
     id = Column(Integer, primary_key=True)
+
     url = Column(String, nullable=False)
 
+    def __str__(self):
+        return f"{self.url}"
+
+
+# =========================================================
+# USER
+# =========================================================
 
 class UserModel(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
+
     firstname = Column(String(100), nullable=False)
     lastname = Column(String(100), nullable=False)
-    email = Column(String(200), unique=True, index=True, nullable=False)
+
+    email = Column(
+        String(200),
+        nullable=False,
+        unique=True,
+        index=True
+    )
+
     password = Column(String(255), nullable=False)
-    image_id = Column(Integer, ForeignKey("images.id"), nullable=False)
-    status_id = Column(Integer, ForeignKey("status.id"), nullable=False)
-    project_id = Column(Integer, ForeignKey("project.id"), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    image_id = Column(
+        Integer,
+        ForeignKey("images.id"),
+        nullable=True,
+        index=True
+    )
+
+    status_id = Column(
+        Integer,
+        ForeignKey("statuses.id"),
+        nullable=False,
+        index=True
+    )
+
+    project_id = Column(
+        Integer,
+        ForeignKey("projects.id"),
+        nullable=False,
+        index=True
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now()
+    )
 
     # Relationships
     image = relationship("ImageModel")
     status = relationship("StatusModel")
     project = relationship("ProjectModel")
-    tokens = relationship("TokenModel", back_populates="user")
 
+    tokens = relationship(
+        "TokenModel",
+        back_populates="user"
+    )
+
+
+# =========================================================
+# TOKEN
+# =========================================================
 
 class TokenModel(Base):
     __tablename__ = "tokens"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    access_token = Column(String(500), unique=True, nullable=False)
-    refresh_token = Column(String(500), unique=True, nullable=False)
-    expires_at = Column(DateTime(timezone=True), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=False,
+        index=True
+    )
+
+    access_token = Column(
+        String(500),
+        nullable=False,
+        unique=True
+    )
+
+    refresh_token = Column(
+        String(500),
+        nullable=False,
+        unique=True
+    )
+
+    expires_at = Column(
+        DateTime(timezone=True),
+        nullable=False
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now()
+    )
 
     # Relationships
-    user = relationship("UserModel", back_populates="tokens")
+    user = relationship(
+        "UserModel",
+        back_populates="tokens"
+    )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#
+# class StatusModel(Base):
+#     __tablename__ = "statuses"
+#     id = Column(Integer, primary_key=True)
+#     status = Column(String, nullable=False, unique=True)
+#
+#     def __str__(self) -> str:
+#         return f"{self.status}"
+#
+#
+# class ProjectModel(Base):
+#     __tablename__ = "projects"
+#     id = Column(Integer, primary_key=True)
+#     name = Column(String, nullable=False, unique=True)
+#     country = Column(String, nullable=False)
+#     code = Column(String, nullable=False, unique=True)
+#
+#     def __str__(self) -> str:
+#         return f"{self.name} {self.country} {self.code}"
+#
+# class ImageModel(Base):
+#     __tablename__ = "images"
+#     id = Column(Integer, primary_key=True)
+#     url = Column(String, nullable=False)
+#
+#     def __str__(self) -> str:
+#         return f"{self.url}"
+#
+#
+# class UserModel(Base):
+#     __tablename__ = "users"
+#
+#     id = Column(Integer, primary_key=True, index=True)
+#     firstname = Column(String(100), nullable=False)
+#     lastname = Column(String(100), nullable=False)
+#     email = Column(String(200), unique=True, index=True, nullable=False)
+#     password = Column(String(255), nullable=False)
+#     image_id = Column(Integer, ForeignKey("images.id"), nullable=False)
+#     status_id = Column(Integer, ForeignKey("statuses.id"), nullable=False)
+#     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+#     created_at = Column(DateTime(timezone=True), server_default=func.now())
+#
+#     # Relationships
+#     image = relationship("ImageModel")
+#     status = relationship("StatusModel")
+#     project = relationship("ProjectModel")
+#     tokens = relationship("TokenModel", back_populates="user")
+#
+#
+# class TokenModel(Base):
+#     __tablename__ = "tokens"
+#
+#     id = Column(Integer, primary_key=True, index=True)
+#     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+#     access_token = Column(String(500), unique=True, nullable=False)
+#     refresh_token = Column(String(500), unique=True, nullable=False)
+#     expires_at = Column(DateTime(timezone=True), nullable=False)
+#     created_at = Column(DateTime(timezone=True), server_default=func.now())
+#
+#     # Relationships
+#     user = relationship("UserModel", back_populates="tokens")
