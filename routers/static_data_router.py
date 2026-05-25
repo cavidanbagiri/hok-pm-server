@@ -1,4 +1,5 @@
 # routers/static_data_router.py
+import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Annotated
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,14 +7,67 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from auth.token_handler import TokenHandler
 from database.setup import get_db
 from models.common_model import StockDataModel, TypeModel
-from repositories.static_repository import ExcelStockImporter
+from repositories.static_repository import ExcelStockImporter, ExcelMTOALLImporter
 
 from repositories.common_repository import CheckAdminManagerAuthorize
 
 router = APIRouter()
 
 
-@router.post("/import_stock_excel", status_code=200)
+@router.post("/import_mto_all", status_code=201)
+async def import_mto_all(
+        db: Annotated[AsyncSession, Depends(get_db)],
+        user_info: dict = Depends(TokenHandler.verify_access_token)
+):
+    try:
+        user_id = user_info.get('sub')
+        auth_check = CheckAdminManagerAuthorize(db, int(user_id))
+        await auth_check.check_admin_or_manager()
+
+        # CHANGE THIS LINE - Use the correct MTO file
+        excel_path = "static_datas/MTO_ALL_data.xlsx"  # Make sure this file exists
+        # NOT "static_datas/Stock_data.xlsx"
+
+        importer = ExcelMTOALLImporter(db, excel_path, int(user_id))
+        result = await importer.import_excel()
+
+        return result
+
+    except HTTPException as ex:
+        raise ex
+    except Exception as ex:
+        print('ex is ', ex)
+        raise HTTPException(500, f'Internal server error {ex}')
+
+
+
+
+# Add temporary debug endpoint
+@router.get("/debug_mto_columns", status_code=200)
+async def debug_mto_columns(
+        db: Annotated[AsyncSession, Depends(get_db)],
+        user_info: dict = Depends(TokenHandler.verify_access_token)
+):
+    try:
+        user_id = user_info.get('sub')
+        auth_check = CheckAdminManagerAuthorize(db, int(user_id))
+        await auth_check.check_admin_or_manager()
+
+        excel_path = "static_datas/MTO_ALL_data.xlsx"
+        df = pd.read_excel(excel_path, engine='openpyxl', nrows=0)  # Read only headers
+
+        print("\n=== MTO EXCEL COLUMNS ===")
+        for i, col in enumerate(df.columns):
+            print(f"{i}: '{col}'")
+        print("=========================\n")
+
+        return {"columns": list(df.columns)}
+
+    except Exception as ex:
+        raise HTTPException(500, f'Error: {str(ex)}')
+
+
+@router.post("/import_stock_excel", status_code=201)
 async def import_stock_excel(
         db: Annotated[AsyncSession, Depends(get_db)],
         user_info: dict = Depends(TokenHandler.verify_access_token)
@@ -42,6 +96,11 @@ async def import_stock_excel(
 
 
 #####################################################################################################################################################################################################################################################
+
+#####################################################################################################################################################################################################################################################
+
+
+
 
 
 
