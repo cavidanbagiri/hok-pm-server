@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from sqlalchemy.orm import selectinload
 
-from models.user_model import UserModel, StatusModel
+from models.user_model import UserModel, StatusModel, ProjectModel
 from models.common_model import AreaModel, LocationModel, UomModel, TypeModel, StockDataModel, SubTypeModel, Size1Model, \
     DescriptionModel, MaterialModel, Size2Model, TypesModel
 
@@ -197,12 +197,10 @@ class CreateAreaRepository:
 ########################################################################### Location Classes tested
 class FetchLocationRepository:
 
-    def __init__(self, db_session: AsyncSession, location_id: int = None, project_id: int = None):
+    def __init__(self, db_session: AsyncSession):
         self.db_session = db_session
-        self.location_id = location_id
-        self.project_id = project_id
 
-    async def fetch_location(self,  user_id: int, area_id: int = None, project_id: int = None):
+    async def fetch_location(self,  user_id: int, project_id: int = None):
         # MUST await here - GetUserInformation is async
         user_info = await GetUserInformation(self.db_session, user_id).get_user_information()
 
@@ -1102,10 +1100,6 @@ class CreateTypeRepository:
 
 
 
-
-
-
-
 ########################################################################### Stock Classes
 class FetchStockRepository:
 
@@ -1178,3 +1172,52 @@ class CreateStockRepository:
 
         return stock
 
+
+
+
+########################################################################### Project Classes
+class FetchProjectRepository:
+
+    def __init__(self, db_session: AsyncSession):
+        self.db_session = db_session
+
+    async def fetch_project(self, user_id: int):
+
+        # Get user info
+        user_info = await GetUserInformation(
+            self.db_session,
+            user_id
+        ).get_user_information()
+
+        # Base query
+        query = select(ProjectModel)
+
+        # Admin or Manager
+        is_admin_or_manager = user_info['status_id'] in [1, 2]
+
+        # Regular users only see their own project
+        if not is_admin_or_manager:
+            query = query.where(
+                ProjectModel.id == user_info['project_id']
+            )
+
+        # Execute query
+        result = await self.db_session.execute(query)
+        projects = result.scalars().all()
+
+        if not projects:
+            raise HTTPException(
+                status_code=404,
+                detail="Project not found"
+            )
+
+        # Return serialized data
+        return [
+            {
+                "id": project.id,
+                "name": project.name,
+                "country": project.country,
+                "code": project.code
+            }
+            for project in projects
+        ]

@@ -18,7 +18,7 @@ from repositories.common_repository import (
     CreateSize1Repository, CreateSubTypeRepository, FetchSubTypeRepository, FetchSize1Repository, FetchSize2Repository,
     FetchMaterialRepository, FetchDescriptionRepository, FetchItemTypesRepository, CreateItemTypesRepository,
     BulkCreateSubTypeRepository, BulkCreateSize1Repository, BulkCreateSize2Repository, BulkCreateMaterialRepository,
-    BulkCreateDescriptionRepository
+    BulkCreateDescriptionRepository, FetchProjectRepository
 )
 
 router = APIRouter()
@@ -571,3 +571,26 @@ async def create_stock(
 
 
 
+########################################################################### Project Functions
+
+@router.get("/fetch_projects", status_code=200)
+async def fetch_projects(
+        db: Annotated[AsyncSession, Depends(get_db)],
+        user_info: dict = Depends(TokenHandler.verify_access_token),
+):
+    try:
+        user_id = int(user_info.get('sub'))
+
+        repo = FetchProjectRepository(db)
+        result = await repo.fetch_project(user_id)
+
+        return {"data": result}
+
+    except HTTPException as ex:
+        raise ex
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error"
+        )
