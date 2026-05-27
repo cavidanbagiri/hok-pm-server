@@ -8,22 +8,11 @@ from database.setup import get_db
 
 from schemas.common_schema import *
 
-from repositories.common_repository import (
-    CreateAreaRepository,
-    CreateLocationRepository,
-    CreateUomRepository,
-    CreateTypeRepository,
-    CreateStockRepository, FetchAreaRepository, FetchLocationRepository, FetchUomRepository, FetchTypeRepository,
-    FetchStockRepository, CreateDescriptionRepository, CreateMaterialRepository, CreateSize2Repository,
-    CreateSize1Repository, CreateSubTypeRepository, FetchSubTypeRepository, FetchSize1Repository, FetchSize2Repository,
-    FetchMaterialRepository, FetchDescriptionRepository, FetchItemTypesRepository, CreateItemTypesRepository,
-    BulkCreateSubTypeRepository, BulkCreateSize1Repository, BulkCreateSize2Repository, BulkCreateMaterialRepository,
-    BulkCreateDescriptionRepository, FetchProjectRepository
-)
+from repositories.common_repository import *
 
 router = APIRouter()
 
-#
+
 # ########################################################################### Area Functions Filter tested
 @router.get("/fetch_area", status_code=200)
 async def fetch_area(
@@ -76,6 +65,36 @@ async def create_area(
     except HTTPException as ex:
         raise ex
     except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error"
+        )
+
+@router.put("/update_area/{area_id}", status_code=200)
+async def update_area(
+        area_id: int,
+        data: UpdateAreaSchema,
+        db: Annotated[AsyncSession, Depends(get_db)],
+        user_info: dict = Depends(TokenHandler.verify_access_token)
+):
+    try:
+        user_id = user_info.get('sub')
+        repo = UpdateAreaRepository(db, data, int(user_id), area_id)
+        result = await repo.update_area()
+        return {
+            "message": "Area updated successfully",
+            "id": result.id,
+            "name": result.name,
+            "description": result.description,
+            "doc_no": result.doc_no,
+            "doc_rev": result.doc_rev,
+            "say_iso_no": result.say_iso_no,
+            "project_id": result.project_id
+        }
+    except HTTPException as ex:
+        raise ex
+    except Exception as ex:
+        print(ex)
         raise HTTPException(
             status_code=500,
             detail="Internal server error"
@@ -138,7 +157,30 @@ async def create_location(
         )
 
 
-
+@router.put("/update_location/{location_id}", status_code=200)
+async def update_location(
+        location_id: int,
+        data: UpdateLocationSchema,
+        db: Annotated[AsyncSession, Depends(get_db)],
+        user_info: dict = Depends(TokenHandler.verify_access_token)
+):
+    try:
+        user_id = user_info.get('sub')
+        repo = UpdateLocationRepository(db, data, int(user_id), location_id)
+        result = await repo.update_location()
+        return {
+            "message": "Location updated successfully",
+            "id": result.id,
+            "name": result.name,
+            "project_id": result.project_id
+        }
+    except HTTPException as ex:
+        raise ex
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error"
+        )
 
 
 
@@ -172,7 +214,6 @@ async def fetch_uom(
         )
 
 
-
 @router.post("/create_uom", status_code=201)
 async def create_uom(
         data: CreateUomSchema,
@@ -193,7 +234,29 @@ async def create_uom(
         )
 
 
-
+@router.put("/update_uom/{uom_id}", status_code=200)
+async def update_uom(
+        uom_id: int,
+        data: UpdateUomSchema,
+        db: Annotated[AsyncSession, Depends(get_db)],
+        user_info: dict = Depends(TokenHandler.verify_access_token)
+):
+    try:
+        user_id = user_info.get('sub')
+        repo = UpdateUomRepository(db, data, int(user_id), uom_id)
+        result = await repo.update_uom()
+        return {
+            "message": "UOM updated successfully",
+            "id": result.id,
+            "name": result.name
+        }
+    except HTTPException as ex:
+        raise ex
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error"
+        )
 
 
 
@@ -248,6 +311,30 @@ async def create_size1(
             detail="Internal server error"
         )
 
+
+@router.put("/update_size1/{size1_id}", status_code=200)
+async def update_size1(
+        size1_id: int,
+        data: UpdateSize1Schema,
+        db: Annotated[AsyncSession, Depends(get_db)],
+        user_info: dict = Depends(TokenHandler.verify_access_token)
+):
+    try:
+        user_id = user_info.get('sub')
+        repo = UpdateSize1Repository(db, data, int(user_id), size1_id)
+        result = await repo.update_size1()
+        return {
+            "message": "Size1 updated successfully", 
+            "id": result.id, 
+            "name": result.name
+        }
+    except HTTPException as ex:
+        raise ex
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error"
+        )
 
 @router.post("/bulk_create_size1", status_code=201)
 async def bulk_create_size1(
@@ -318,6 +405,32 @@ async def create_size2(
             status_code=500,
             detail="Internal server error"
         )
+
+
+@router.put("/update_size2/{size2_id}", status_code=200)
+async def update_size2(
+        size2_id: int,
+        data: UpdateSize2Schema,
+        db: Annotated[AsyncSession, Depends(get_db)],
+        user_info: dict = Depends(TokenHandler.verify_access_token)
+):
+    try:
+        user_id = user_info.get('sub')
+        repo = UpdateSize2Repository(db, data, int(user_id), size2_id)
+        result = await repo.update_size2()
+        return {
+            "message": "Size2 updated successfully",
+            "id": result.id,
+            "name": result.name
+        }
+    except HTTPException as ex:
+        raise ex
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error"
+        )
+
 
 @router.post("/bulk_create_size2", status_code=201)
 async def bulk_create_size2(
@@ -392,6 +505,31 @@ async def create_material(
         )
 
 
+@router.put("/update_material/{material_id}", status_code=200)
+async def update_material(
+        material_id: int,
+        data: UpdateMaterialSchema,
+        db: Annotated[AsyncSession, Depends(get_db)],
+        user_info: dict = Depends(TokenHandler.verify_access_token)
+):
+    try:
+        user_id = user_info.get('sub')
+        repo = UpdateMaterialRepository(db, data, int(user_id), material_id)
+        result = await repo.update_material()
+        return {
+            "message": "Material updated successfully",
+            "id": result.id,
+            "name": result.name
+        }
+    except HTTPException as ex:
+        raise ex
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error"
+        )
+
+
 @router.post("/bulk_create_material", status_code=201)
 async def bulk_create_material(
         data: BulkCreateMaterialSchema,
@@ -442,6 +580,7 @@ async def fetch_description(
             detail="Internal server error"
         )
 
+
 @router.post("/create_description", status_code=201)
 async def create_description(
         data: CreateDescriptionSchema,
@@ -460,6 +599,32 @@ async def create_description(
             status_code=500,
             detail="Internal server error"
         )
+
+
+@router.put("/update_description/{description_id}", status_code=200)
+async def update_description(
+        description_id: int,
+        data: UpdateDescriptionSchema,
+        db: Annotated[AsyncSession, Depends(get_db)],
+        user_info: dict = Depends(TokenHandler.verify_access_token)
+):
+    try:
+        user_id = user_info.get('sub')
+        repo = UpdateDescriptionRepository(db, data, int(user_id), description_id)
+        result = await repo.update_description()
+        return {
+            "message": "Description updated successfully",
+            "id": result.id,
+            "name": result.name
+        }
+    except HTTPException as ex:
+        raise ex
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error"
+        )
+
 
 @router.post("/bulk_create_description", status_code=201)
 async def bulk_create_descriptions(
@@ -530,6 +695,32 @@ async def create_subtype(
             detail="Internal server error"
         )
 
+
+@router.put("/update_subtype/{subtype_id}", status_code=200)
+async def update_subtype(
+        subtype_id: int,
+        data: UpdateSubTypeSchema,
+        db: Annotated[AsyncSession, Depends(get_db)],
+        user_info: dict = Depends(TokenHandler.verify_access_token)
+):
+    try:
+        user_id = user_info.get('sub')
+        repo = UpdateSubTypeRepository(db, data, int(user_id), subtype_id)
+        result = await repo.update_subtype()
+        return {
+            "message": "SubType updated successfully",
+            "id": result.id,
+            "name": result.name
+        }
+    except HTTPException as ex:
+        raise ex
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error"
+        )
+
+
 @router.post("/bulk_create_subtype", status_code=201)
 async def bulk_create_subtype(
         data: BulkCreateSubTypeSchema,
@@ -599,7 +790,29 @@ async def create_types(
         )
 
 
-
+@router.put("/update_item_types/{types_id}", status_code=200)
+async def update_types(
+        types_id: int,
+        data: UpdateTypesSchema,
+        db: Annotated[AsyncSession, Depends(get_db)],
+        user_info: dict = Depends(TokenHandler.verify_access_token)
+):
+    try:
+        user_id = user_info.get('sub')
+        repo = UpdateItemTypesRepository(db, data, int(user_id), types_id)
+        result = await repo.update_types()
+        return {
+            "message": "Types updated successfully",
+            "id": result.id,
+            "name": result.name
+        }
+    except HTTPException as ex:
+        raise ex
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error"
+        )
 
 
 

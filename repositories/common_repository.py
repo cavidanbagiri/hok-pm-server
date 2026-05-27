@@ -4,19 +4,16 @@ from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, update
 from sqlalchemy.orm import selectinload
 
 from models.user_model import UserModel, StatusModel, ProjectModel
 from models.common_model import AreaModel, LocationModel, UomModel, TypeModel, StockDataModel, SubTypeModel, Size1Model, \
     DescriptionModel, MaterialModel, Size2Model, TypesModel
 
-from schemas.common_schema import CreateStockSchema, CreateTypeSchema, CreateUomSchema, CreateLocationSchema, \
-    CreateAreaSchema, CreateDescriptionSchema, CreateSize2Schema, CreateSize1Schema, CreateMaterialSchema, \
-    CreateSubTypeSchema, CreateTypesSchema, BulkCreateSubTypeSchema, BulkCreateSize1Schema, BulkCreateSize2Schema, \
-    BulkCreateMaterialSchema, BulkCreateDescriptionSchema
+from schemas.common_schema import *
 
-
+########################################################################### User Classes tested
 class CheckAdminManagerAuthorize:
 
     def __init__(self, db: AsyncSession, user_id: int):
@@ -48,7 +45,6 @@ class CheckAdminManagerAuthorize:
             )
 
         return user
-
 
 class GetUserInformation:
     def __init__(self, db: AsyncSession, user_id: int):
@@ -86,6 +82,7 @@ class GetUserInformation:
                 status_code=500,
                 detail=f"Error fetching user information: {str(e)}"
             )
+
 
 
 ########################################################################### Area Classes tested
@@ -161,7 +158,6 @@ class FetchAreaRepository:
 
         return areas
 
-
 class CreateAreaRepository:
 
     def __init__(
@@ -224,6 +220,107 @@ class CreateAreaRepository:
         except Exception:
             await self.db_session.rollback()
             raise
+
+class UpdateAreaRepository:
+
+    def __init__(
+            self,
+            db_session: AsyncSession,
+            data: UpdateAreaSchema,
+            user_id: int,
+            area_id: int
+    ):
+        self.db_session = db_session
+        self.data = data
+        self.user_id = user_id
+        self.area_id = area_id
+
+    async def update_area(self):
+
+        # Authorization
+        await CheckAdminManagerAuthorize(
+            self.db_session,
+            self.user_id
+        ).check_admin_or_manager()
+
+        # Check if area exists
+        existing_area = await self.db_session.scalar(
+            select(AreaModel).where(AreaModel.id == self.area_id)
+        )
+
+        if not existing_area:
+            raise HTTPException(
+                status_code=404,
+                detail="Area not found"
+            )
+
+        # Prepare update data
+        update_data = {}
+
+        if self.data.name is not None:
+            name = self.data.name.strip().upper()
+            update_data['name'] = name
+
+            # Check duplicate name if name is being changed
+            if name != existing_area.name:
+                duplicate_area = await self.db_session.scalar(
+                    select(AreaModel).where(
+                        AreaModel.name == name,
+                        AreaModel.project_id == (
+                            self.data.project_id if self.data.project_id is not None else existing_area.project_id),
+                        AreaModel.id != self.area_id
+                    )
+                )
+                if duplicate_area:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Area already exists in this project"
+                    )
+
+        if self.data.description is not None:
+            update_data['description'] = self.data.description.strip().upper()
+
+        if self.data.doc_no is not None:
+            update_data['doc_no'] = self.data.doc_no.strip().upper()
+
+        if self.data.doc_rev is not None:
+            update_data['doc_rev'] = self.data.doc_rev.strip().upper()
+
+        if self.data.say_iso_no is not None:
+            update_data['say_iso_no'] = self.data.say_iso_no.strip().upper()
+
+        if self.data.project_id is not None:
+            update_data['project_id'] = self.data.project_id
+
+        if not update_data:
+            raise HTTPException(
+                status_code=400,
+                detail="No fields provided for update"
+            )
+
+        try:
+            # Perform update
+            await self.db_session.execute(
+                update(AreaModel)
+                .where(AreaModel.id == self.area_id)
+                .values(**update_data)
+            )
+
+            await self.db_session.commit()
+
+            # Fetch updated area
+            updated_area = await self.db_session.scalar(
+                select(AreaModel).where(AreaModel.id == self.area_id)
+            )
+
+            return updated_area
+
+        except Exception:
+            await self.db_session.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail="Error updating area"
+            )
 
 
 
@@ -338,6 +435,95 @@ class CreateLocationRepository:
             await self.db_session.rollback()
             raise
 
+class UpdateLocationRepository:
+
+    def __init__(
+            self,
+            db_session: AsyncSession,
+            data: UpdateLocationSchema,
+            user_id: int,
+            location_id: int
+    ):
+        self.db_session = db_session
+        self.data = data
+        self.user_id = user_id
+        self.location_id = location_id
+
+    async def update_location(self):
+
+        # Authorization
+        await CheckAdminManagerAuthorize(
+            self.db_session,
+            self.user_id
+        ).check_admin_or_manager()
+
+        # Check if location exists
+        existing_location = await self.db_session.scalar(
+            select(LocationModel).where(LocationModel.id == self.location_id)
+        )
+
+        if not existing_location:
+            raise HTTPException(
+                status_code=404,
+                detail="Location not found"
+            )
+
+        # Prepare update data
+        update_data = {}
+
+        if self.data.name is not None:
+            location_name = self.data.name.strip().upper()
+            update_data['name'] = location_name
+
+            # Check duplicate if name is being changed
+            if location_name != existing_location.name:
+                duplicate_location = await self.db_session.scalar(
+                    select(LocationModel).where(
+                        LocationModel.name == location_name,
+                        LocationModel.project_id == (
+                            self.data.project_id if self.data.project_id is not None else existing_location.project_id),
+                        LocationModel.id != self.location_id
+                    )
+                )
+                if duplicate_location:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Location already exists in this project"
+                    )
+
+        if self.data.project_id is not None:
+            update_data['project_id'] = self.data.project_id
+
+        if not update_data:
+            raise HTTPException(
+                status_code=400,
+                detail="No fields provided for update"
+            )
+
+        try:
+            # Perform update
+            await self.db_session.execute(
+                update(LocationModel)
+                .where(LocationModel.id == self.location_id)
+                .values(**update_data)
+            )
+
+            await self.db_session.commit()
+
+            # Fetch updated location
+            updated_location = await self.db_session.scalar(
+                select(LocationModel).where(LocationModel.id == self.location_id)
+            )
+
+            return updated_location
+
+        except Exception:
+            await self.db_session.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail="Error updating location"
+            )
+
 
 ########################################################################### Uom Classes tested
 class FetchUomRepository:
@@ -426,6 +612,90 @@ class CreateUomRepository:
             await self.db_session.rollback()
             raise
 
+class UpdateUomRepository:
+
+    def __init__(
+            self,
+            db_session: AsyncSession,
+            data: UpdateUomSchema,
+            user_id: int,
+            uom_id: int
+    ):
+        self.db_session = db_session
+        self.data = data
+        self.user_id = user_id
+        self.uom_id = uom_id
+
+    async def update_uom(self):
+
+        # Authorization
+        await CheckAdminManagerAuthorize(
+            self.db_session,
+            self.user_id
+        ).check_admin_or_manager()
+
+        # Check if UOM exists
+        existing_uom = await self.db_session.scalar(
+            select(UomModel).where(UomModel.id == self.uom_id)
+        )
+
+        if not existing_uom:
+            raise HTTPException(
+                status_code=404,
+                detail="UOM not found"
+            )
+
+        # Prepare update data
+        update_data = {}
+
+        if self.data.name is not None:
+            uom_name = self.data.name.strip().upper()
+            update_data['name'] = uom_name
+
+            # Check duplicate if name is being changed
+            if uom_name != existing_uom.name:
+                duplicate_uom = await self.db_session.scalar(
+                    select(UomModel).where(
+                        UomModel.name == uom_name,
+                        UomModel.id != self.uom_id
+                    )
+                )
+                if duplicate_uom:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="UOM already exists"
+                    )
+
+        if not update_data:
+            raise HTTPException(
+                status_code=400,
+                detail="No fields provided for update"
+            )
+
+        try:
+            # Perform update
+            await self.db_session.execute(
+                update(UomModel)
+                .where(UomModel.id == self.uom_id)
+                .values(**update_data)
+            )
+
+            await self.db_session.commit()
+
+            # Fetch updated UOM
+            updated_uom = await self.db_session.scalar(
+                select(UomModel).where(UomModel.id == self.uom_id)
+            )
+
+            return updated_uom
+
+        except Exception:
+            await self.db_session.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail="Error updating UOM"
+            )
+
 
 
 ########################################################################### Size1 Classes tested
@@ -502,6 +772,90 @@ class CreateSize1Repository:
         except Exception:
             await self.db_session.rollback()
             raise
+
+class UpdateSize1Repository:
+
+    def __init__(
+            self,
+            db_session: AsyncSession,
+            data: UpdateSize1Schema,
+            user_id: int,
+            size1_id: int
+    ):
+        self.db_session = db_session
+        self.data = data
+        self.user_id = user_id
+        self.size1_id = size1_id
+
+    async def update_size1(self):
+
+        # Authorization
+        await CheckAdminManagerAuthorize(
+            self.db_session,
+            self.user_id
+        ).check_admin_or_manager()
+
+        # Check if Size1 exists
+        existing_size1 = await self.db_session.scalar(
+            select(Size1Model).where(Size1Model.id == self.size1_id)
+        )
+
+        if not existing_size1:
+            raise HTTPException(
+                status_code=404,
+                detail="Size1 not found"
+            )
+
+        # Prepare update data
+        update_data = {}
+
+        if self.data.name is not None:
+            size1_name = self.data.name.strip().upper()
+            update_data['name'] = size1_name
+
+            # Check duplicate if name is being changed
+            if size1_name != existing_size1.name:
+                duplicate_size1 = await self.db_session.scalar(
+                    select(Size1Model).where(
+                        Size1Model.name == size1_name,
+                        Size1Model.id != self.size1_id
+                    )
+                )
+                if duplicate_size1:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Size already exists"
+                    )
+
+        if not update_data:
+            raise HTTPException(
+                status_code=400,
+                detail="No fields provided for update"
+            )
+
+        try:
+            # Perform update
+            await self.db_session.execute(
+                update(Size1Model)
+                .where(Size1Model.id == self.size1_id)
+                .values(**update_data)
+            )
+
+            await self.db_session.commit()
+
+            # Fetch updated Size1
+            updated_size1 = await self.db_session.scalar(
+                select(Size1Model).where(Size1Model.id == self.size1_id)
+            )
+
+            return updated_size1
+
+        except Exception:
+            await self.db_session.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail="Error updating Size1"
+            )
 
 class BulkCreateSize1Repository:
 
@@ -626,6 +980,90 @@ class CreateSize2Repository:
             await self.db_session.rollback()
             raise
 
+class UpdateSize2Repository:
+
+    def __init__(
+            self,
+            db_session: AsyncSession,
+            data: UpdateSize2Schema,
+            user_id: int,
+            size2_id: int
+    ):
+        self.db_session = db_session
+        self.data = data
+        self.user_id = user_id
+        self.size2_id = size2_id
+
+    async def update_size2(self):
+
+        # Authorization
+        await CheckAdminManagerAuthorize(
+            self.db_session,
+            self.user_id
+        ).check_admin_or_manager()
+
+        # Check if Size2 exists
+        existing_size2 = await self.db_session.scalar(
+            select(Size2Model).where(Size2Model.id == self.size2_id)
+        )
+
+        if not existing_size2:
+            raise HTTPException(
+                status_code=404,
+                detail="Size2 not found"
+            )
+
+        # Prepare update data
+        update_data = {}
+
+        if self.data.name is not None:
+            size2_name = self.data.name.strip().upper()
+            update_data['name'] = size2_name
+
+            # Check duplicate if name is being changed
+            if size2_name != existing_size2.name:
+                duplicate_size2 = await self.db_session.scalar(
+                    select(Size2Model).where(
+                        Size2Model.name == size2_name,
+                        Size2Model.id != self.size2_id
+                    )
+                )
+                if duplicate_size2:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Size2 already exists"
+                    )
+
+        if not update_data:
+            raise HTTPException(
+                status_code=400,
+                detail="No fields provided for update"
+            )
+
+        try:
+            # Perform update
+            await self.db_session.execute(
+                update(Size2Model)
+                .where(Size2Model.id == self.size2_id)
+                .values(**update_data)
+            )
+
+            await self.db_session.commit()
+
+            # Fetch updated Size2
+            updated_size2 = await self.db_session.scalar(
+                select(Size2Model).where(Size2Model.id == self.size2_id)
+            )
+
+            return updated_size2
+
+        except Exception:
+            await self.db_session.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail="Error updating Size2"
+            )
+
 class BulkCreateSize2Repository:
 
     def __init__(self, db_session: AsyncSession, data: BulkCreateSize2Schema, user_id: int):
@@ -748,6 +1186,90 @@ class CreateMaterialRepository:
             await self.db_session.rollback()
             raise
 
+class UpdateMaterialRepository:
+
+    def __init__(
+            self,
+            db_session: AsyncSession,
+            data: UpdateMaterialSchema,
+            user_id: int,
+            material_id: int
+    ):
+        self.db_session = db_session
+        self.data = data
+        self.user_id = user_id
+        self.material_id = material_id
+
+    async def update_material(self):
+
+        # Authorization
+        await CheckAdminManagerAuthorize(
+            self.db_session,
+            self.user_id
+        ).check_admin_or_manager()
+
+        # Check if Material exists
+        existing_material = await self.db_session.scalar(
+            select(MaterialModel).where(MaterialModel.id == self.material_id)
+        )
+
+        if not existing_material:
+            raise HTTPException(
+                status_code=404,
+                detail="Material not found"
+            )
+
+        # Prepare update data
+        update_data = {}
+
+        if self.data.name is not None:
+            material_name = self.data.name.strip().upper()
+            update_data['name'] = material_name
+
+            # Check duplicate if name is being changed
+            if material_name != existing_material.name:
+                duplicate_material = await self.db_session.scalar(
+                    select(MaterialModel).where(
+                        MaterialModel.name == material_name,
+                        MaterialModel.id != self.material_id
+                    )
+                )
+                if duplicate_material:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Material already exists"
+                    )
+
+        if not update_data:
+            raise HTTPException(
+                status_code=400,
+                detail="No fields provided for update"
+            )
+
+        try:
+            # Perform update
+            await self.db_session.execute(
+                update(MaterialModel)
+                .where(MaterialModel.id == self.material_id)
+                .values(**update_data)
+            )
+
+            await self.db_session.commit()
+
+            # Fetch updated Material
+            updated_material = await self.db_session.scalar(
+                select(MaterialModel).where(MaterialModel.id == self.material_id)
+            )
+
+            return updated_material
+
+        except Exception:
+            await self.db_session.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail="Error updating Material"
+            )
+
 class BulkCreateMaterialRepository:
 
     def __init__(self, db_session: AsyncSession, data: BulkCreateMaterialSchema, user_id: int):
@@ -798,7 +1320,6 @@ class BulkCreateMaterialRepository:
             "total_created": len(created_items),
             "total_failed": len(failed_items)
         }
-
 
 
 
@@ -870,6 +1391,90 @@ class CreateDescriptionRepository:
         except Exception:
             await self.db_session.rollback()
             raise
+
+class UpdateDescriptionRepository:
+
+    def __init__(
+            self,
+            db_session: AsyncSession,
+            data: UpdateDescriptionSchema,
+            user_id: int,
+            description_id: int
+    ):
+        self.db_session = db_session
+        self.data = data
+        self.user_id = user_id
+        self.description_id = description_id
+
+    async def update_description(self):
+
+        # Authorization
+        await CheckAdminManagerAuthorize(
+            self.db_session,
+            self.user_id
+        ).check_admin_or_manager()
+
+        # Check if Description exists
+        existing_description = await self.db_session.scalar(
+            select(DescriptionModel).where(DescriptionModel.id == self.description_id)
+        )
+
+        if not existing_description:
+            raise HTTPException(
+                status_code=404,
+                detail="Description not found"
+            )
+
+        # Prepare update data
+        update_data = {}
+
+        if self.data.name is not None:
+            description_name = self.data.name.strip().upper()
+            update_data['name'] = description_name
+
+            # Check duplicate if name is being changed
+            if description_name != existing_description.name:
+                duplicate_description = await self.db_session.scalar(
+                    select(DescriptionModel).where(
+                        DescriptionModel.name == description_name,
+                        DescriptionModel.id != self.description_id
+                    )
+                )
+                if duplicate_description:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Description already exists"
+                    )
+
+        if not update_data:
+            raise HTTPException(
+                status_code=400,
+                detail="No fields provided for update"
+            )
+
+        try:
+            # Perform update
+            await self.db_session.execute(
+                update(DescriptionModel)
+                .where(DescriptionModel.id == self.description_id)
+                .values(**update_data)
+            )
+
+            await self.db_session.commit()
+
+            # Fetch updated Description
+            updated_description = await self.db_session.scalar(
+                select(DescriptionModel).where(DescriptionModel.id == self.description_id)
+            )
+
+            return updated_description
+
+        except Exception:
+            await self.db_session.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail="Error updating Description"
+            )
 
 class BulkCreateDescriptionRepository:
 
@@ -1020,6 +1625,90 @@ class CreateSubTypeRepository:
             await self.db_session.rollback()
             raise
 
+class UpdateSubTypeRepository:
+
+    def __init__(
+            self,
+            db_session: AsyncSession,
+            data: UpdateSubTypeSchema,
+            user_id: int,
+            subtype_id: int
+    ):
+        self.db_session = db_session
+        self.data = data
+        self.user_id = user_id
+        self.subtype_id = subtype_id
+
+    async def update_subtype(self):
+
+        # Authorization
+        await CheckAdminManagerAuthorize(
+            self.db_session,
+            self.user_id
+        ).check_admin_or_manager()
+
+        # Check if SubType exists
+        existing_subtype = await self.db_session.scalar(
+            select(SubTypeModel).where(SubTypeModel.id == self.subtype_id)
+        )
+
+        if not existing_subtype:
+            raise HTTPException(
+                status_code=404,
+                detail="SubType not found"
+            )
+
+        # Prepare update data
+        update_data = {}
+
+        if self.data.name is not None:
+            subtype_name = self.data.name.strip().upper()
+            update_data['name'] = subtype_name
+
+            # Check duplicate if name is being changed
+            if subtype_name != existing_subtype.name:
+                duplicate_subtype = await self.db_session.scalar(
+                    select(SubTypeModel).where(
+                        SubTypeModel.name == subtype_name,
+                        SubTypeModel.id != self.subtype_id
+                    )
+                )
+                if duplicate_subtype:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="SubType already exists"
+                    )
+
+        if not update_data:
+            raise HTTPException(
+                status_code=400,
+                detail="No fields provided for update"
+            )
+
+        try:
+            # Perform update
+            await self.db_session.execute(
+                update(SubTypeModel)
+                .where(SubTypeModel.id == self.subtype_id)
+                .values(**update_data)
+            )
+
+            await self.db_session.commit()
+
+            # Fetch updated SubType
+            updated_subtype = await self.db_session.scalar(
+                select(SubTypeModel).where(SubTypeModel.id == self.subtype_id)
+            )
+
+            return updated_subtype
+
+        except Exception:
+            await self.db_session.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail="Error updating SubType"
+            )
+
 class BulkCreateSubTypeRepository:
 
     def __init__(self, db_session: AsyncSession, data: BulkCreateSubTypeSchema, user_id: int):
@@ -1141,6 +1830,89 @@ class CreateItemTypesRepository:
             await self.db_session.rollback()
             raise
 
+class UpdateItemTypesRepository:
+
+    def __init__(
+            self,
+            db_session: AsyncSession,
+            data: UpdateTypesSchema,
+            user_id: int,
+            types_id: int
+    ):
+        self.db_session = db_session
+        self.data = data
+        self.user_id = user_id
+        self.types_id = types_id
+
+    async def update_types(self):
+
+        # Authorization
+        await CheckAdminManagerAuthorize(
+            self.db_session,
+            self.user_id
+        ).check_admin_or_manager()
+
+        # Check if Types exists
+        existing_types = await self.db_session.scalar(
+            select(TypesModel).where(TypesModel.id == self.types_id)
+        )
+
+        if not existing_types:
+            raise HTTPException(
+                status_code=404,
+                detail="Types not found"
+            )
+
+        # Prepare update data
+        update_data = {}
+
+        if self.data.name is not None:
+            types_name = self.data.name.strip().upper()
+            update_data['name'] = types_name
+
+            # Check duplicate if name is being changed
+            if types_name != existing_types.name:
+                duplicate_types = await self.db_session.scalar(
+                    select(TypesModel).where(
+                        TypesModel.name == types_name,
+                        TypesModel.id != self.types_id
+                    )
+                )
+                if duplicate_types:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Types already exists"
+                    )
+
+        if not update_data:
+            raise HTTPException(
+                status_code=400,
+                detail="No fields provided for update"
+            )
+
+        try:
+            # Perform update
+            await self.db_session.execute(
+                update(TypesModel)
+                .where(TypesModel.id == self.types_id)
+                .values(**update_data)
+            )
+
+            await self.db_session.commit()
+
+            # Fetch updated Types
+            updated_types = await self.db_session.scalar(
+                select(TypesModel).where(TypesModel.id == self.types_id)
+            )
+
+            return updated_types
+
+        except Exception:
+            await self.db_session.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail="Error updating Types"
+            )
 
 
 
