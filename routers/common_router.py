@@ -24,20 +24,38 @@ from repositories.common_repository import (
 router = APIRouter()
 
 #
-# ########################################################################### Area Functions
+# ########################################################################### Area Functions Filter tested
 @router.get("/fetch_area", status_code=200)
 async def fetch_area(
         db: Annotated[AsyncSession, Depends(get_db)],
         user_info: dict = Depends(TokenHandler.verify_access_token),
-        project_id: int = None  # Optional filter for admin/manager
+        project_id: int | None = None,
+        name: str | None = None,
+        description: str | None = None,
+        doc_no: str | None = None,
+        doc_rev: str | None = None,
+        say_iso_no: str | None = None,
 ):
     try:
         user_id = int(user_info['sub'])
+
         repo = FetchAreaRepository(db)
-        result = await repo.fetch_area(user_id, project_id=project_id)
+
+        result = await repo.fetch_area(
+            user_id=user_id,
+            project_id=project_id,
+            name=name,
+            description=description,
+            doc_no=doc_no,
+            doc_rev=doc_rev,
+            say_iso_no=say_iso_no
+        )
+
         return {"data": result}
+
     except HTTPException as ex:
         raise ex
+
     except Exception:
         raise HTTPException(
             status_code=500,
@@ -66,23 +84,38 @@ async def create_area(
 
 
 
-########################################################################### Location Functions
+########################################################################### Location Functions Filter tested
 @router.get("/fetch_location", status_code=200)
 async def fetch_location(
         db: Annotated[AsyncSession, Depends(get_db)],
         user_info: dict = Depends(TokenHandler.verify_access_token),
-        project_id: int = None  # Optional filter for admin/manager
+
+        # Filters
+        project_id: int | None = None,
+        name: str | None = None,
 ):
     try:
+
         user_id = int(user_info['sub'])
+
         repo = FetchLocationRepository(db)
-        result = await repo.fetch_location(user_id, project_id=project_id)
+
+        result = await repo.fetch_location(
+            user_id=user_id,
+            project_id=project_id,
+            name=name
+        )
+
         return {"data": result}
+
     except HTTPException as ex:
         raise ex
-    except Exception as ex:
-        raise HTTPException(500, f'Internal server error {ex}')
 
+    except Exception as ex:
+        raise HTTPException(
+            500,
+            f"Internal server error {ex}"
+        )
 
 
 @router.post("/create_location", status_code=201)
@@ -113,16 +146,30 @@ async def create_location(
 @router.get("/fetch_uom", status_code=200)
 async def fetch_uom(
         db: Annotated[AsyncSession, Depends(get_db)],
-        uom_id: int = None
+
+        # Filters
+        uom_id: int | None = None,
+        name: str | None = None,
 ):
     try:
-        repo = FetchUomRepository(db, uom_id)
-        result = await repo.fetch_uom()
+
+        repo = FetchUomRepository(db)
+
+        result = await repo.fetch_uom(
+            uom_id=uom_id,
+            name=name
+        )
+
         return {"data": result}
+
     except HTTPException as ex:
         raise ex
+
     except Exception as ex:
-        raise HTTPException(500, f'Internal server error {ex}')
+        raise HTTPException(
+            500,
+            f"Internal server error {ex}"
+        )
 
 
 
@@ -156,14 +203,25 @@ async def create_uom(
 @router.get("/fetch_size1", status_code=200)
 async def fetch_size1(
         db: Annotated[AsyncSession, Depends(get_db)],
-        size1_id: int = None
+
+        # Filters
+        size1_id: int | None = None,
+        name: str | None = None,
 ):
     try:
-        repo = FetchSize1Repository(db, size1_id)
-        result = await repo.fetch_size1()
+
+        repo = FetchSize1Repository(db)
+
+        result = await repo.fetch_size1(
+            size1_id=size1_id,
+            name=name
+        )
+
         return {"data": result}
+
     except HTTPException as ex:
         raise ex
+
     except Exception:
         raise HTTPException(
             status_code=500,
@@ -217,14 +275,25 @@ async def bulk_create_size1(
 @router.get("/fetch_size2", status_code=200)
 async def fetch_size2(
         db: Annotated[AsyncSession, Depends(get_db)],
-        size2_id: int = None
+
+        # Filters
+        size2_id: int | None = None,
+        name: str | None = None,
 ):
     try:
-        repo = FetchSize2Repository(db, size2_id)
-        result = await repo.fetch_size2()
+
+        repo = FetchSize2Repository(db)
+
+        result = await repo.fetch_size2(
+            size2_id=size2_id,
+            name=name
+        )
+
         return {"data": result}
+
     except HTTPException as ex:
         raise ex
+
     except Exception:
         raise HTTPException(
             status_code=500,
@@ -277,14 +346,25 @@ async def bulk_create_size2(
 @router.get("/fetch_material", status_code=200)
 async def fetch_material(
         db: Annotated[AsyncSession, Depends(get_db)],
-        material_id: int = None
+
+        # Filters
+        material_id: int | None = None,
+        name: str | None = None,
 ):
     try:
-        repo = FetchMaterialRepository(db, material_id)
-        result = await repo.fetch_material()
+
+        repo = FetchMaterialRepository(db)
+
+        result = await repo.fetch_material(
+            material_id=material_id,
+            name=name
+        )
+
         return {"data": result}
+
     except HTTPException as ex:
         raise ex
+
     except Exception:
         raise HTTPException(
             status_code=500,
@@ -337,14 +417,25 @@ async def bulk_create_material(
 @router.get("/fetch_description", status_code=200)
 async def fetch_description(
         db: Annotated[AsyncSession, Depends(get_db)],
-        description_id: int = None
+
+        # Filters
+        description_id: int | None = None,
+        name: str | None = None,
 ):
     try:
-        repo = FetchDescriptionRepository(db, description_id)
-        result = await repo.fetch_description()
+
+        repo = FetchDescriptionRepository(db)
+
+        result = await repo.fetch_description(
+            description_id=description_id,
+            name=name
+        )
+
         return {"data": result}
+
     except HTTPException as ex:
         raise ex
+
     except Exception:
         raise HTTPException(
             status_code=500,
@@ -395,14 +486,25 @@ async def bulk_create_descriptions(
 @router.get("/fetch_subtype", status_code=200)
 async def fetch_subtype(
         db: Annotated[AsyncSession, Depends(get_db)],
-        subtype_id: int = None
+
+        # Filters
+        subtype_id: int | None = None,
+        name: str | None = None,
 ):
     try:
-        repo = FetchSubTypeRepository(db, subtype_id)
-        result = await repo.fetch_subtype()
+
+        repo = FetchSubTypeRepository(db)
+
+        result = await repo.fetch_subtype(
+            subtype_id=subtype_id,
+            name=name
+        )
+
         return {"data": result}
+
     except HTTPException as ex:
         raise ex
+
     except Exception:
         raise HTTPException(
             status_code=500,
@@ -452,14 +554,25 @@ async def bulk_create_subtype(
 @router.get("/fetch_item_types", status_code=200)
 async def fetch_types(
         db: Annotated[AsyncSession, Depends(get_db)],
-        types_id: int = None
+
+        # Filters
+        types_id: int | None = None,
+        name: str | None = None,
 ):
     try:
-        repo = FetchItemTypesRepository(db, types_id)
-        result = await repo.fetch_types()
+
+        repo = FetchItemTypesRepository(db)
+
+        result = await repo.fetch_types(
+            types_id=types_id,
+            name=name
+        )
+
         return {"data": result}
+
     except HTTPException as ex:
         raise ex
+
     except Exception:
         raise HTTPException(
             status_code=500,

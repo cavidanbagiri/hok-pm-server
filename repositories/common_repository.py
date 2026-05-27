@@ -93,37 +93,70 @@ class FetchAreaRepository:
     def __init__(self, db_session: AsyncSession):
         self.db_session = db_session
 
-    async def fetch_area(self, user_id: int, project_id: int = None):
-        """
-        Fetch areas based on user permissions
-        - Regular users: Only see their project's areas
-        - Admin (status_id=1) or Manager (status_id=2): See all areas
-        """
+    async def fetch_area(
+            self,
+            user_id: int,
+            project_id: int = None,
+            name: str = None,
+            description: str = None,
+            doc_no: str = None,
+            doc_rev: str = None,
+            say_iso_no: str = None
+    ):
 
-        # MUST await here - GetUserInformation is async
-        user_info = await GetUserInformation(self.db_session, user_id).get_user_information()
+        user_info = await GetUserInformation(
+            self.db_session,
+            user_id
+        ).get_user_information()
 
-        # Build base query
-        # query = select(AreaModel)
         query = (
             select(AreaModel)
             .options(selectinload(AreaModel.project))
         )
 
-        # Check if user is Admin (status_id=1) or Manager (status_id=2)
+        # Admin or manager check
         is_admin_or_manager = user_info['status_id'] in [1, 2]
 
+        # Regular user restriction
         if not is_admin_or_manager:
-            # Regular user - filter by their project_id
-            query = query.where(AreaModel.project_id == user_info['project_id'])
-        else:
-            # Admin or Manager - apply additional filters if provided
-            if project_id:
-                query = query.where(AreaModel.project_id == project_id)
+            query = query.where(
+                AreaModel.project_id == user_info['project_id']
+            )
 
+        # Admin/Manager project filter
+        elif project_id:
+            query = query.where(
+                AreaModel.project_id == project_id
+            )
 
-        # Execute query - MUST use await
+        # Additional filters
+        if name:
+            query = query.where(
+                AreaModel.name.ilike(f"%{name}%")
+            )
+
+        if description:
+            query = query.where(
+                AreaModel.description.ilike(f"%{description}%")
+            )
+
+        if doc_no:
+            query = query.where(
+                AreaModel.doc_no.ilike(f"%{doc_no}%")
+            )
+
+        if doc_rev:
+            query = query.where(
+                AreaModel.doc_rev.ilike(f"%{doc_rev}%")
+            )
+
+        if say_iso_no:
+            query = query.where(
+                AreaModel.say_iso_no.ilike(f"%{say_iso_no}%")
+            )
+
         result = await self.db_session.execute(query)
+
         areas = result.scalars().all()
 
         return areas
@@ -200,27 +233,50 @@ class FetchLocationRepository:
     def __init__(self, db_session: AsyncSession):
         self.db_session = db_session
 
-    async def fetch_location(self,  user_id: int, project_id: int = None):
-        # MUST await here - GetUserInformation is async
-        user_info = await GetUserInformation(self.db_session, user_id).get_user_information()
+    async def fetch_location(
+            self,
+            user_id: int,
+            project_id: int = None,
+            name: str = None
+    ):
+
+        # MUST await here
+        user_info = await GetUserInformation(
+            self.db_session,
+            user_id
+        ).get_user_information()
 
         query = (
             select(LocationModel)
             .options(selectinload(LocationModel.project))
         )
 
-        # Check if user is Admin (status_id=1) or Manager (status_id=2)
+        # Check role
         is_admin_or_manager = user_info['status_id'] in [1, 2]
 
+        # Regular user
         if not is_admin_or_manager:
-            # Regular user - filter by their project_id
-            query = query.where(LocationModel.project_id == user_info['project_id'])
+
+            query = query.where(
+                LocationModel.project_id == user_info['project_id']
+            )
+
+        # Admin/Manager filters
         else:
-            # Admin or Manager - apply additional filters if provided
+
             if project_id:
-                query = query.where(LocationModel.project_id == project_id)
+                query = query.where(
+                    LocationModel.project_id == project_id
+                )
+
+        # Name filter
+        if name:
+            query = query.where(
+                LocationModel.name.ilike(f"%{name}%")
+            )
 
         result = await self.db_session.execute(query)
+
         locations = result.scalars().all()
 
         if not locations:
@@ -286,17 +342,31 @@ class CreateLocationRepository:
 ########################################################################### Uom Classes tested
 class FetchUomRepository:
 
-    def __init__(self, db_session: AsyncSession, uom_id: int = None):
+    def __init__(self, db_session: AsyncSession):
         self.db_session = db_session
-        self.uom_id = uom_id
 
-    async def fetch_uom(self):
+    async def fetch_uom(
+            self,
+            uom_id: int = None,
+            name: str = None
+    ):
+
         query = select(UomModel)
 
-        if self.uom_id:
-            query = query.where(UomModel.id == self.uom_id)
+        # Filter by ID
+        if uom_id:
+            query = query.where(
+                UomModel.id == uom_id
+            )
+
+        # Filter by name
+        if name:
+            query = query.where(
+                UomModel.name.ilike(f"%{name}%")
+            )
 
         result = await self.db_session.execute(query)
+
         uoms = result.scalars().all()
 
         if not uoms:
@@ -361,24 +431,40 @@ class CreateUomRepository:
 ########################################################################### Size1 Classes tested
 class FetchSize1Repository:
 
-    def __init__(self, db_session: AsyncSession, size1_id: Optional[int] = None):
+    def __init__(self, db_session: AsyncSession):
         self.db_session = db_session
-        self.size1_id = size1_id
 
-    async def fetch_size1(self) -> List[Size1Model]:
-        """Always returns a list for consistency"""
-        query = select(Size1Model).order_by(Size1Model.id)
+    async def fetch_size1(
+            self,
+            size1_id: int = None,
+            name: str = None
+    ) -> List[Size1Model]:
 
-        if self.size1_id:
-            query = query.where(Size1Model.id == self.size1_id)
+        query = (
+            select(Size1Model)
+            .order_by(Size1Model.id)
+        )
+
+        # Filter by ID
+        if size1_id:
+            query = query.where(
+                Size1Model.id == size1_id
+            )
+
+        # Filter by name
+        if name:
+            query = query.where(
+                Size1Model.name.ilike(f"%{name}%")
+            )
 
         result = await self.db_session.execute(query)
+
         sizes1 = result.scalars().all()
 
         if not sizes1:
             raise HTTPException(404, "Size1 not found")
 
-        return sizes1  # Always returns list, even for single result
+        return sizes1
 
 class CreateSize1Repository:
 
@@ -477,17 +563,35 @@ class FetchSize2Repository:
         self.db_session = db_session
         self.size2_id = size2_id
 
-    async def fetch_size2(self):
-        query = select(Size2Model).order_by(Size2Model.id)  # Add order_by for consistency
+    async def fetch_size2(
+            self,
+            size2_id: int = None,
+            name: str = None
+    ) -> List[Size1Model]:
 
-        if self.size2_id:
-            query = query.where(Size2Model.id == self.size2_id)
+        query = (
+            select(Size2Model)
+            .order_by(Size2Model.id)
+        )
+
+        # Filter by ID
+        if size2_id:
+            query = query.where(
+                Size2Model.id == size2_id
+            )
+
+        # Filter by name
+        if name:
+            query = query.where(
+                Size2Model.name.ilike(f"%{name}%")
+            )
 
         result = await self.db_session.execute(query)
+
         sizes2 = result.scalars().all()
 
         if not sizes2:
-            raise HTTPException(404, "Size2 not found")
+            raise HTTPException(404, "Size1 not found")
 
         return sizes2
 
@@ -578,18 +682,34 @@ class BulkCreateSize2Repository:
 ########################################################################### Material Classes tested
 class FetchMaterialRepository:
 
-    def __init__(self, db_session: AsyncSession, material_id: int = None):
+    def __init__(self, db_session: AsyncSession):
         self.db_session = db_session
-        self.material_id = material_id
 
-    async def fetch_material(self):
-        # Add order_by for consistent results
-        query = select(MaterialModel).order_by(MaterialModel.id)
+    async def fetch_material(
+            self,
+            material_id: int = None,
+            name: str = None
+    ):
 
-        if self.material_id:
-            query = query.where(MaterialModel.id == self.material_id)
+        query = (
+            select(MaterialModel)
+            .order_by(MaterialModel.id)
+        )
+
+        # Filter by ID
+        if material_id:
+            query = query.where(
+                MaterialModel.id == material_id
+            )
+
+        # Filter by name
+        if name:
+            query = query.where(
+                MaterialModel.name.ilike(f"%{name}%")
+            )
 
         result = await self.db_session.execute(query)
+
         materials = result.scalars().all()
 
         if not materials:
@@ -685,18 +805,34 @@ class BulkCreateMaterialRepository:
 ########################################################################### Description Classes tested
 class FetchDescriptionRepository:
 
-    def __init__(self, db_session: AsyncSession, description_id: int = None):
+    def __init__(self, db_session: AsyncSession):
         self.db_session = db_session
-        self.description_id = description_id
 
-    async def fetch_description(self):
-        # Add order_by for consistent results
-        query = select(DescriptionModel).order_by(DescriptionModel.id)
+    async def fetch_description(
+            self,
+            description_id: int = None,
+            name: str = None
+    ):
 
-        if self.description_id:
-            query = query.where(DescriptionModel.id == self.description_id)
+        query = (
+            select(DescriptionModel)
+            .order_by(DescriptionModel.id)
+        )
+
+        # Filter by ID
+        if description_id:
+            query = query.where(
+                DescriptionModel.id == description_id
+            )
+
+        # Filter by name
+        if name:
+            query = query.where(
+                DescriptionModel.name.ilike(f"%{name}%")
+            )
 
         result = await self.db_session.execute(query)
+
         descriptions = result.scalars().all()
 
         if not descriptions:
@@ -818,18 +954,34 @@ class BulkCreateDescriptionRepository:
 ########################################################################### Description Classes tested
 class FetchSubTypeRepository:
 
-    def __init__(self, db_session: AsyncSession, subtype_id: int = None):
+    def __init__(self, db_session: AsyncSession):
         self.db_session = db_session
-        self.subtype_id = subtype_id
 
-    async def fetch_subtype(self):
-        # Add order_by for consistent results
-        query = select(SubTypeModel).order_by(SubTypeModel.id)
+    async def fetch_subtype(
+            self,
+            subtype_id: int = None,
+            name: str = None
+    ):
 
-        if self.subtype_id:
-            query = query.where(SubTypeModel.id == self.subtype_id)
+        query = (
+            select(SubTypeModel)
+            .order_by(SubTypeModel.id)
+        )
+
+        # Filter by ID
+        if subtype_id:
+            query = query.where(
+                SubTypeModel.id == subtype_id
+            )
+
+        # Filter by name
+        if name:
+            query = query.where(
+                SubTypeModel.name.ilike(f"%{name}%")
+            )
 
         result = await self.db_session.execute(query)
+
         subtypes = result.scalars().all()
 
         if not subtypes:
@@ -924,18 +1076,34 @@ class BulkCreateSubTypeRepository:
 ########################################################################### Types Classes # Can be: [valve, reducer, pee, tie, elbow, ...]
 class FetchItemTypesRepository:
 
-    def __init__(self, db_session: AsyncSession, types_id: int = None):
+    def __init__(self, db_session: AsyncSession):
         self.db_session = db_session
-        self.types_id = types_id
 
-    async def fetch_types(self):
-        # Add order_by for consistent results
-        query = select(TypesModel).order_by(TypesModel.id)
+    async def fetch_types(
+            self,
+            types_id: int = None,
+            name: str = None
+    ):
 
-        if self.types_id:
-            query = query.where(TypesModel.id == self.types_id)
+        query = (
+            select(TypesModel)
+            .order_by(TypesModel.id)
+        )
+
+        # Filter by ID
+        if types_id:
+            query = query.where(
+                TypesModel.id == types_id
+            )
+
+        # Filter by name
+        if name:
+            query = query.where(
+                TypesModel.name.ilike(f"%{name}%")
+            )
 
         result = await self.db_session.execute(query)
+
         types = result.scalars().all()
 
         if not types:

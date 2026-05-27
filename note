@@ -1,1 +1,73 @@
 
+
+l wanna add filter options  to the page. can we fix it?
+
+#router.py
+@router.get("/fetch_area", status_code=200)
+async def fetch_area(
+        db: Annotated[AsyncSession, Depends(get_db)],
+        user_info: dict = Depends(TokenHandler.verify_access_token),
+        project_id: int = None  # Optional filter for admin/manager
+):
+    try:
+        user_id = int(user_info['sub'])
+        repo = FetchAreaRepository(db)
+        result = await repo.fetch_area(user_id, project_id=project_id)
+        return {"data": result}
+    except HTTPException as ex:
+        raise ex
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error"
+        )
+
+# repository.py
+class FetchAreaRepository:
+    def __init__(self, db_session: AsyncSession):
+        self.db_session = db_session
+
+    async def fetch_area(self, user_id: int, project_id: int = None):
+        """
+        Fetch areas based on user permissions
+        - Regular users: Only see their project's areas
+        - Admin (status_id=1) or Manager (status_id=2): See all areas
+        """
+
+        # MUST await here - GetUserInformation is async
+        user_info = await GetUserInformation(self.db_session, user_id).get_user_information()
+
+        # Build base query
+        # query = select(AreaModel)
+        query = (
+            select(AreaModel)
+            .options(selectinload(AreaModel.project))
+        )
+
+        # Check if user is Admin (status_id=1) or Manager (status_id=2)
+        is_admin_or_manager = user_info['status_id'] in [1, 2]
+
+        if not is_admin_or_manager:
+            # Regular user - filter by their project_id
+            query = query.where(AreaModel.project_id == user_info['project_id'])
+        else:
+            # Admin or Manager - apply additional filters if provided
+            if project_id:
+                query = query.where(AreaModel.project_id == project_id)
+
+
+        # Execute query - MUST use await
+        result = await self.db_session.execute(query)
+        areas = result.scalars().all()
+
+        return areas
+
+# schemas.py
+class CreateAreaSchema(BaseModel):
+    name: str
+    description: str
+    doc_no: str
+    doc_rev: str
+    say_iso_no: str
+    project_id: int
+
