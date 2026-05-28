@@ -119,6 +119,9 @@ class UpdateTypesSchema(BaseModel):
     name: Optional[str] = None
 
 
+
+
+######################################### Type Schema
 class CreateTypeSchema(BaseModel):
     type_id: int  # Changed from subtype_id to type_id
     subtype_id: int
@@ -130,13 +133,20 @@ class CreateTypeSchema(BaseModel):
     thickness_2: Optional[str] = None
 
 
+class UpdateTypeSchema(BaseModel):
+    type_id: Optional[int] = None
+    subtype_id: Optional[int] = None
+    size1_id: Optional[int] = None
+    size2_id: Optional[int] = None
+    material_id: Optional[int] = None
+    description_id: Optional[int] = None
+    thickness_1: Optional[str] = None
+    thickness_2: Optional[str] = None
 
 
 
-class CreateUomSchema(BaseModel):
-    name: str
 
-
+######################################### Stock Schema
 class CreateStockSchema(BaseModel):
     stock_code: str
     alternative_id: Optional[str] = None
@@ -144,3 +154,12 @@ class CreateStockSchema(BaseModel):
     comment: Optional[str] = None
     type_id: int
     uom_id: int
+
+
+class UpdateStockSchema(BaseModel):
+    stock_code: Optional[str] = None
+    alternative_id: Optional[str] = None
+    old_code: Optional[str] = None
+    comment: Optional[str] = None
+    type_id: Optional[int] = None
+    uom_id: Optional[int] = None

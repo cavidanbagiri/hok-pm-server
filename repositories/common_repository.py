@@ -1919,12 +1919,31 @@ class UpdateItemTypesRepository:
 ########################################################################### Type Classes
 class FetchTypeRepository:
 
-    def __init__(self, db_session: AsyncSession, type_id: int = None, types_id: int = None):
+    def __init__(self, db_session: AsyncSession):
         self.db_session = db_session
-        self.type_id = type_id
-        self.types_id = types_id
 
-    async def fetch_type(self):
+    async def fetch_type(
+            self,
+            type_id: Optional[int] = None,
+            types_id: Optional[int] = None,
+            subtype_id: Optional[int] = None,
+            size1_id: Optional[int] = None,
+            size2_id: Optional[int] = None,
+            material_id: Optional[int] = None,
+            description_id: Optional[int] = None,
+            type_name: Optional[str] = None,
+            subtype_name: Optional[str] = None,
+            size1_name: Optional[str] = None,
+            size2_name: Optional[str] = None,
+            material_name: Optional[str] = None,
+            description_name: Optional[str] = None,
+            thickness_1: Optional[str] = None,
+            thickness_2: Optional[str] = None,
+            page: int = 1,
+            limit: int = 50
+    ):
+
+        # Build base query with joins for name filters
         query = select(TypeModel).options(
             selectinload(TypeModel.type),
             selectinload(TypeModel.subtype),
@@ -1932,21 +1951,85 @@ class FetchTypeRepository:
             selectinload(TypeModel.size2),
             selectinload(TypeModel.material),
             selectinload(TypeModel.description)
-        ).order_by(TypeModel.id)  # Add order_by for consistency
+        )
 
-        if self.type_id:
-            query = query.where(TypeModel.id == self.type_id)
+        # Apply filters
+        # ID filters
+        if type_id is not None:
+            query = query.where(TypeModel.id == type_id)
 
-        if self.types_id:
-            query = query.where(TypeModel.type_id == self.types_id)
+        if types_id is not None:
+            query = query.where(TypeModel.type_id == types_id)
 
+        if subtype_id is not None:
+            query = query.where(TypeModel.subtype_id == subtype_id)
+
+        if size1_id is not None:
+            query = query.where(TypeModel.size1_id == size1_id)
+
+        if size2_id is not None:
+            query = query.where(TypeModel.size2_id == size2_id)
+
+        if material_id is not None:
+            query = query.where(TypeModel.material_id == material_id)
+
+        if description_id is not None:
+            query = query.where(TypeModel.description_id == description_id)
+
+        # Name filters (case-insensitive partial match)
+        if type_name is not None:
+            query = query.join(TypeModel.type).where(
+                TypesModel.name.ilike(f"%{type_name}%")
+            )
+
+        if subtype_name is not None:
+            query = query.join(TypeModel.subtype).where(
+                SubTypeModel.name.ilike(f"%{subtype_name}%")
+            )
+
+        if size1_name is not None:
+            query = query.join(TypeModel.size1).where(
+                Size1Model.name.ilike(f"%{size1_name}%")
+            )
+
+        if size2_name is not None:
+            query = query.join(TypeModel.size2).where(
+                Size2Model.name.ilike(f"%{size2_name}%")
+            )
+
+        if material_name is not None:
+            query = query.join(TypeModel.material).where(
+                MaterialModel.name.ilike(f"%{material_name}%")
+            )
+
+        if description_name is not None:
+            query = query.join(TypeModel.description).where(
+                DescriptionModel.name.ilike(f"%{description_name}%")
+            )
+
+        # Thickness filters
+        if thickness_1 is not None:
+            query = query.where(TypeModel.thickness_1 == thickness_1)
+
+        if thickness_2 is not None:
+            query = query.where(TypeModel.thickness_2 == thickness_2)
+
+        # Get total count before pagination
+        count_query = select(func.count()).select_from(query.subquery())
+        total_count = await self.db_session.scalar(count_query)
+
+        if total_count == 0:
+            return [], 0
+
+        # Apply pagination
+        offset = (page - 1) * limit
+        query = query.order_by(TypeModel.id).offset(offset).limit(limit)
+
+        # Execute query
         result = await self.db_session.execute(query)
         types = result.scalars().all()
 
-        if not types:
-            raise HTTPException(404, "Type not found")
-
-        return types
+        return types, total_count
 
 class CreateTypeRepository:
 
@@ -2038,32 +2121,327 @@ class CreateTypeRepository:
                 detail="Internal server error while creating type"
             )
 
+class UpdateTypeRepository:
+
+    def __init__(
+            self,
+            db_session: AsyncSession,
+            data: UpdateTypeSchema,
+            user_id: int,
+            type_id: int
+    ):
+        self.db_session = db_session
+        self.data = data
+        self.user_id = user_id
+        self.type_id = type_id
+
+    async def update_type(self):
+
+        # Authorization (same as other endpoints)
+        await CheckAdminManagerAuthorize(
+            self.db_session,
+            self.user_id
+        ).check_admin_or_manager()
+
+        # Check if Type exists
+        existing_type = await self.db_session.scalar(
+            select(TypeModel).where(TypeModel.id == self.type_id)
+        )
+
+        if not existing_type:
+            raise HTTPException(
+                status_code=404,
+                detail="Type not found"
+            )
+
+        # Prepare update data (only include fields that are provided)
+        update_data = {}
+
+        if self.data.type_id is not None:
+            # Validate that type_id exists in TypesModel
+            type_exists = await self.db_session.scalar(
+                select(TypesModel).where(TypesModel.id == self.data.type_id)
+            )
+            if not type_exists:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Type with id {self.data.type_id} not found"
+                )
+            update_data['type_id'] = self.data.type_id
+
+        if self.data.subtype_id is not None:
+            # Validate that subtype_id exists in SubTypeModel
+            subtype_exists = await self.db_session.scalar(
+                select(SubTypeModel).where(SubTypeModel.id == self.data.subtype_id)
+            )
+            if not subtype_exists:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"SubType with id {self.data.subtype_id} not found"
+                )
+            update_data['subtype_id'] = self.data.subtype_id
+
+        if self.data.size1_id is not None:
+            # Validate that size1_id exists in Size1Model
+            size1_exists = await self.db_session.scalar(
+                select(Size1Model).where(Size1Model.id == self.data.size1_id)
+            )
+            if not size1_exists:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Size1 with id {self.data.size1_id} not found"
+                )
+            update_data['size1_id'] = self.data.size1_id
+
+        if self.data.size2_id is not None:
+            # Validate that size2_id exists in Size2Model (can be nullable)
+            if self.data.size2_id > 0:  # Assuming 0 or negative means null
+                size2_exists = await self.db_session.scalar(
+                    select(Size2Model).where(Size2Model.id == self.data.size2_id)
+                )
+                if not size2_exists:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Size2 with id {self.data.size2_id} not found"
+                    )
+            update_data['size2_id'] = self.data.size2_id if self.data.size2_id > 0 else None
+
+        if self.data.material_id is not None:
+            # Validate that material_id exists in MaterialModel
+            material_exists = await self.db_session.scalar(
+                select(MaterialModel).where(MaterialModel.id == self.data.material_id)
+            )
+            if not material_exists:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Material with id {self.data.material_id} not found"
+                )
+            update_data['material_id'] = self.data.material_id
+
+        if self.data.description_id is not None:
+            # Validate that description_id exists in DescriptionModel
+            description_exists = await self.db_session.scalar(
+                select(DescriptionModel).where(DescriptionModel.id == self.data.description_id)
+            )
+            if not description_exists:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Description with id {self.data.description_id} not found"
+                )
+            update_data['description_id'] = self.data.description_id
+
+        if self.data.thickness_1 is not None:
+            update_data['thickness_1'] = self.data.thickness_1.strip() if self.data.thickness_1 else None
+
+        if self.data.thickness_2 is not None:
+            update_data['thickness_2'] = self.data.thickness_2.strip() if self.data.thickness_2 else None
+
+        if not update_data:
+            raise HTTPException(
+                status_code=400,
+                detail="No fields provided for update"
+            )
+
+        try:
+            # Perform update
+            await self.db_session.execute(
+                update(TypeModel)
+                .where(TypeModel.id == self.type_id)
+                .values(**update_data)
+            )
+
+            await self.db_session.commit()
+
+            # Fetch updated Type with all relationships
+            updated_type = await self.db_session.scalar(
+                select(TypeModel)
+                .options(
+                    selectinload(TypeModel.type),
+                    selectinload(TypeModel.subtype),
+                    selectinload(TypeModel.size1),
+                    selectinload(TypeModel.size2),
+                    selectinload(TypeModel.material),
+                    selectinload(TypeModel.description)
+                )
+                .where(TypeModel.id == self.type_id)
+            )
+
+            return updated_type
+
+        except Exception as e:
+            await self.db_session.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error updating Type: {str(e)}"
+            )
 
 
 ########################################################################### Stock Classes
+# class FetchStockRepository:
+#
+#     def __init__(self, db_session: AsyncSession):
+#         self.db_session = db_session
+#
+#     async def fetch_stock(
+#             self,
+#             stock_id: Optional[int] = None,
+#             stock_code: Optional[str] = None,
+#             alternative_id: Optional[str] = None,
+#             old_code: Optional[str] = None,
+#             comment: Optional[str] = None,
+#             type_id: Optional[int] = None,
+#             uom_id: Optional[int] = None,
+#             # Name filters for relationships
+#             type_name: Optional[str] = None,
+#             uom_name: Optional[str] = None,
+#             # Pagination
+#             page: int = 1,
+#             limit: int = 50
+#     ):
+#
+#         # Build base query with eager loading
+#         query = select(StockDataModel).options(
+#             selectinload(StockDataModel.item_type),  # TypeModel relationship
+#             selectinload(StockDataModel.uom)  # UomModel relationship
+#         )
+#
+#         # Apply ID filters
+#         if stock_id is not None:
+#             query = query.where(StockDataModel.id == stock_id)
+#
+#         if type_id is not None:
+#             query = query.where(StockDataModel.type_id == type_id)
+#
+#         if uom_id is not None:
+#             query = query.where(StockDataModel.uom_id == uom_id)
+#
+#         # Apply string filters (case-insensitive partial match)
+#         if stock_code is not None:
+#             query = query.where(StockDataModel.stock_code.ilike(f"%{stock_code}%"))
+#
+#         if alternative_id is not None:
+#             query = query.where(StockDataModel.alternative_id.ilike(f"%{alternative_id}%"))
+#
+#         if old_code is not None:
+#             query = query.where(StockDataModel.old_code.ilike(f"%{old_code}%"))
+#
+#         if comment is not None:
+#             query = query.where(StockDataModel.comment.ilike(f"%{comment}%"))
+#
+#         # Apply relationship name filters
+#         if type_name is not None:
+#             query = query.join(StockDataModel.item_type).where(
+#                 TypeModel.name.ilike(f"%{type_name}%")
+#             )
+#
+#         if uom_name is not None:
+#             query = query.join(StockDataModel.uom).where(
+#                 UomModel.name.ilike(f"%{uom_name}%")
+#             )
+#
+#         # Get total count before pagination
+#         count_query = select(func.count()).select_from(query.subquery())
+#         total_count = await self.db_session.scalar(count_query)
+#
+#         if total_count == 0:
+#             return [], 0
+#
+#         # Apply pagination
+#         offset = (page - 1) * limit
+#         query = query.order_by(StockDataModel.id).offset(offset).limit(limit)
+#
+#         # Execute query
+#         result = await self.db_session.execute(query)
+#         stocks = result.scalars().all()
+#
+#         return stocks, total_count
+
+
+
 class FetchStockRepository:
 
-    def __init__(self, db_session: AsyncSession, stock_id: int = None, stock_code: str = None):
+    def __init__(self, db_session: AsyncSession):
         self.db_session = db_session
-        self.stock_id = stock_id
-        self.stock_code = stock_code
 
-    async def fetch_stock(self):
-        query = select(StockDataModel)
+    async def fetch_stock(
+            self,
+            stock_id: Optional[int] = None,
+            stock_code: Optional[str] = None,
+            alternative_id: Optional[str] = None,
+            old_code: Optional[str] = None,
+            comment: Optional[str] = None,
+            type_id: Optional[int] = None,
+            uom_id: Optional[int] = None,
+            # Name filters for relationships
+            type_name: Optional[str] = None,
+            uom_name: Optional[str] = None,
+            # Pagination
+            page: int = 1,
+            limit: int = 50
+    ):
 
-        if self.stock_id:
-            query = query.where(StockDataModel.id == self.stock_id)
+        # Build base query with eager loading for ALL nested relationships
+        query = select(StockDataModel).options(
+            selectinload(StockDataModel.item_type).selectinload(TypeModel.type),  # Load type.name
+            selectinload(StockDataModel.item_type).selectinload(TypeModel.subtype),  # Load subtype.name
+            selectinload(StockDataModel.item_type).selectinload(TypeModel.size1),  # Load size1.name
+            selectinload(StockDataModel.item_type).selectinload(TypeModel.size2),  # Load size2.name
+            selectinload(StockDataModel.item_type).selectinload(TypeModel.material),  # Load material.name
+            selectinload(StockDataModel.item_type).selectinload(TypeModel.description),  # Load description.name
+            selectinload(StockDataModel.uom)  # Load uom.name
+        )
 
-        if self.stock_code:
-            query = query.where(StockDataModel.stock_code == self.stock_code)
+        # Apply ID filters
+        if stock_id is not None:
+            query = query.where(StockDataModel.id == stock_id)
 
+        if type_id is not None:
+            query = query.where(StockDataModel.type_id == type_id)
+
+        if uom_id is not None:
+            query = query.where(StockDataModel.uom_id == uom_id)
+
+        # Apply string filters (case-insensitive partial match)
+        if stock_code is not None:
+            query = query.where(StockDataModel.stock_code.ilike(f"%{stock_code}%"))
+
+        if alternative_id is not None:
+            query = query.where(StockDataModel.alternative_id.ilike(f"%{alternative_id}%"))
+
+        if old_code is not None:
+            query = query.where(StockDataModel.old_code.ilike(f"%{old_code}%"))
+
+        if comment is not None:
+            query = query.where(StockDataModel.comment.ilike(f"%{comment}%"))
+
+        # Apply relationship name filters
+        if type_name is not None:
+            query = query.join(StockDataModel.item_type).join(TypeModel.type).where(
+                TypesModel.name.ilike(f"%{type_name}%")
+            )
+
+        if uom_name is not None:
+            query = query.join(StockDataModel.uom).where(
+                UomModel.name.ilike(f"%{uom_name}%")
+            )
+
+        # Get total count before pagination
+        count_query = select(func.count()).select_from(query.subquery())
+        total_count = await self.db_session.scalar(count_query)
+
+        if total_count == 0:
+            return [], 0
+
+        # Apply pagination
+        offset = (page - 1) * limit
+        query = query.order_by(StockDataModel.id).offset(offset).limit(limit)
+
+        # Execute query
         result = await self.db_session.execute(query)
         stocks = result.scalars().all()
 
-        if not stocks:
-            raise HTTPException(404, "Stock data not found")
+        return stocks, total_count
 
-        return stocks
 
 class CreateStockRepository:
 
@@ -2113,6 +2491,128 @@ class CreateStockRepository:
         return stock
 
 
+class UpdateStockRepository:
+
+    def __init__(
+            self,
+            db_session: AsyncSession,
+            data: UpdateStockSchema,
+            user_id: int,
+            stock_id: int
+    ):
+        self.db_session = db_session
+        self.data = data
+        self.user_id = user_id
+        self.stock_id = stock_id
+
+    async def update_stock(self):
+
+        # Authorization
+        await CheckAdminManagerAuthorize(
+            self.db_session,
+            self.user_id
+        ).check_admin_or_manager()
+
+        # Check if Stock exists
+        existing_stock = await self.db_session.scalar(
+            select(StockDataModel).where(StockDataModel.id == self.stock_id)
+        )
+
+        if not existing_stock:
+            raise HTTPException(
+                status_code=404,
+                detail="Stock data not found"
+            )
+
+        # Prepare update data
+        update_data = {}
+
+        if self.data.stock_code is not None:
+            stock_code_upper = self.data.stock_code.strip().upper()
+            update_data['stock_code'] = stock_code_upper
+
+            # Check duplicate if stock_code is being changed
+            if stock_code_upper != existing_stock.stock_code:
+                duplicate_stock = await self.db_session.scalar(
+                    select(StockDataModel).where(
+                        StockDataModel.stock_code == stock_code_upper,
+                        StockDataModel.id != self.stock_id
+                    )
+                )
+                if duplicate_stock:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Stock code already exists"
+                    )
+
+        if self.data.alternative_id is not None:
+            update_data[
+                'alternative_id'] = self.data.alternative_id.strip().upper() if self.data.alternative_id else None
+
+        if self.data.old_code is not None:
+            update_data['old_code'] = self.data.old_code.strip().upper() if self.data.old_code else None
+
+        if self.data.comment is not None:
+            update_data['comment'] = self.data.comment.strip()
+
+        if self.data.type_id is not None:
+            # Validate that type_id exists in TypeModel
+            type_exists = await self.db_session.scalar(
+                select(TypeModel).where(TypeModel.id == self.data.type_id)
+            )
+            if not type_exists:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Type with id {self.data.type_id} not found"
+                )
+            update_data['type_id'] = self.data.type_id
+
+        if self.data.uom_id is not None:
+            # Validate that uom_id exists in UomModel
+            uom_exists = await self.db_session.scalar(
+                select(UomModel).where(UomModel.id == self.data.uom_id)
+            )
+            if not uom_exists:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"UOM with id {self.data.uom_id} not found"
+                )
+            update_data['uom_id'] = self.data.uom_id
+
+        if not update_data:
+            raise HTTPException(
+                status_code=400,
+                detail="No fields provided for update"
+            )
+
+        try:
+            # Perform update
+            await self.db_session.execute(
+                update(StockDataModel)
+                .where(StockDataModel.id == self.stock_id)
+                .values(**update_data)
+            )
+
+            await self.db_session.commit()
+
+            # Fetch updated Stock with relationships
+            updated_stock = await self.db_session.scalar(
+                select(StockDataModel)
+                .options(
+                    selectinload(StockDataModel.item_type),
+                    selectinload(StockDataModel.uom)
+                )
+                .where(StockDataModel.id == self.stock_id)
+            )
+
+            return updated_stock
+
+        except Exception as e:
+            await self.db_session.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error updating Stock data: {str(e)}"
+            )
 
 
 ########################################################################### Project Classes

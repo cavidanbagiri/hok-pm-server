@@ -1,5 +1,5 @@
 # router/admin_router.py
-from fastapi import APIRouter, Depends, Response, HTTPException, Request
+from fastapi import APIRouter, Depends, Response, HTTPException, Request, Query
 from typing import Annotated
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -820,18 +820,65 @@ async def update_types(
 @router.get("/fetch_type", status_code=200)
 async def fetch_type(
         db: Annotated[AsyncSession, Depends(get_db)],
-        type_id: int = None
+        # Existing ID filters
+        type_id: Optional[int] = None,
+        types_id: Optional[int] = None,
+        subtype_id: Optional[int] = None,
+        size1_id: Optional[int] = None,
+        size2_id: Optional[int] = None,
+        material_id: Optional[int] = None,
+        description_id: Optional[int] = None,
+        # New name filters (for related models)
+        type_name: Optional[str] = None,
+        subtype_name: Optional[str] = None,
+        size1_name: Optional[str] = None,
+        size2_name: Optional[str] = None,
+        material_name: Optional[str] = None,
+        description_name: Optional[str] = None,
+        # Thickness filters
+        thickness_1: Optional[str] = None,
+        thickness_2: Optional[str] = None,
+        # Pagination
+        page: Optional[int] = Query(1, ge=1),
+        limit: Optional[int] = Query(50, ge=1, le=200)
 ):
     try:
-        repo = FetchTypeRepository(db, type_id)
-        result = await repo.fetch_type()
-        return {"data": result}
+        repo = FetchTypeRepository(db)
+        result, total_count = await repo.fetch_type(
+            type_id=type_id,
+            types_id=types_id,
+            subtype_id=subtype_id,
+            size1_id=size1_id,
+            size2_id=size2_id,
+            material_id=material_id,
+            description_id=description_id,
+            type_name=type_name,
+            subtype_name=subtype_name,
+            size1_name=size1_name,
+            size2_name=size2_name,
+            material_name=material_name,
+            description_name=description_name,
+            thickness_1=thickness_1,
+            thickness_2=thickness_2,
+            page=page,
+            limit=limit
+        )
+
+        return {
+            "data": result,
+            "pagination": {
+                "current_page": page,
+                "limit": limit,
+                "total_count": total_count,
+                "total_pages": (total_count + limit - 1) // limit if total_count > 0 else 0
+            }
+        }
     except HTTPException as ex:
         raise ex
-    except Exception:
+    except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail="Internal server error"
+            detail=f"Internal server error: {str(e)}"
         )
 
 @router.post("/create_type", status_code=201)
@@ -854,18 +901,23 @@ async def create_type(
         )
 
 
-
-########################################################################### Stock Functions
-@router.get("/fetch_stock_data", status_code=200)
-async def fetch_stock_data(
+@router.put("/update_type/{type_id}", status_code=200)
+async def update_type(
+        type_id: int,
+        data: UpdateTypeSchema,
         db: Annotated[AsyncSession, Depends(get_db)],
-        stock_id: int = None,
-        stock_code: str = None
+        user_info: dict = Depends(TokenHandler.verify_access_token)
 ):
     try:
-        repo = FetchStockRepository(db, stock_id, stock_code)
-        result = await repo.fetch_stock()
-        return {"data": result}
+        user_id = user_info.get('sub')
+        repo = UpdateTypeRepository(db, data, int(user_id), type_id)
+        result = await repo.update_type()
+
+        # Return the updated type with all relationships
+        return {
+            "message": "Type updated successfully",
+            "data": result
+        }
     except HTTPException as ex:
         raise ex
     except Exception:
@@ -873,6 +925,64 @@ async def fetch_stock_data(
             status_code=500,
             detail="Internal server error"
         )
+
+
+########################################################################### Stock Functions
+@router.get("/fetch_stock_data", status_code=200)
+async def fetch_stock_data(
+        db: Annotated[AsyncSession, Depends(get_db)],
+        # ID filters
+        stock_id: Optional[int] = None,
+        type_id: Optional[int] = None,
+        uom_id: Optional[int] = None,
+        # String filters (case-insensitive partial match)
+        stock_code: Optional[str] = None,
+        alternative_id: Optional[str] = None,
+        old_code: Optional[str] = None,
+        comment: Optional[str] = None,
+        # Relationship name filters
+        type_name: Optional[str] = None,
+        uom_name: Optional[str] = None,
+        # Pagination
+        page: Optional[int] = Query(1, ge=1, description="Page number"),
+        limit: Optional[int] = Query(50, ge=1, le=200, description="Items per page (max 200)")
+):
+    try:
+        repo = FetchStockRepository(db)
+        result, total_count = await repo.fetch_stock(
+            stock_id=stock_id,
+            stock_code=stock_code,
+            alternative_id=alternative_id,
+            old_code=old_code,
+            comment=comment,
+            type_id=type_id,
+            uom_id=uom_id,
+            type_name=type_name,
+            uom_name=uom_name,
+            page=page,
+            limit=limit
+        )
+
+        # Calculate total pages
+        total_pages = (total_count + limit - 1) // limit if total_count > 0 else 0
+
+        return {
+            "data": result,
+            "pagination": {
+                "current_page": page,
+                "limit": limit,
+                "total_count": total_count,
+                "total_pages": total_pages
+            }
+        }
+    except HTTPException as ex:
+        raise ex
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
+
 
 @router.post("/create_stock", status_code=201)
 async def create_stock(
@@ -894,6 +1004,54 @@ async def create_stock(
         )
 
 
+@router.put("/update_stock_data/{stock_id}", status_code=200)
+async def update_stock_data(
+        stock_id: int,
+        data: UpdateStockSchema,
+        db: Annotated[AsyncSession, Depends(get_db)],
+        user_info: dict = Depends(TokenHandler.verify_access_token)
+):
+    try:
+        user_id = user_info.get('sub')
+        repo = UpdateStockRepository(db, data, int(user_id), stock_id)
+        result = await repo.update_stock()
+
+        return {
+            "message": "Stock data updated successfully",
+            "data": result
+        }
+    except HTTPException as ex:
+        raise ex
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error"
+        )
+
+
+@router.patch("/update_stock_data/{stock_id}", status_code=200)
+async def update_stock_data_partial(
+        stock_id: int,
+        data: UpdateStockSchema,
+        db: Annotated[AsyncSession, Depends(get_db)],
+        user_info: dict = Depends(TokenHandler.verify_access_token)
+):
+    try:
+        user_id = user_info.get('sub')
+        repo = UpdateStockRepository(db, data, int(user_id), stock_id)
+        result = await repo.update_stock()
+
+        return {
+            "message": "Stock data updated successfully",
+            "data": result
+        }
+    except HTTPException as ex:
+        raise ex
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error"
+        )
 
 
 
