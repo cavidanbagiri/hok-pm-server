@@ -1,6 +1,8 @@
 # router/admin_router.py
 from fastapi import APIRouter, Depends, Response, HTTPException, Request, Query
 from typing import Annotated
+
+from pandas.io.clipboard import clipboard_get
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth.token_handler import TokenHandler
@@ -1077,4 +1079,35 @@ async def fetch_projects(
         raise HTTPException(
             status_code=500,
             detail="Internal server error"
+        )
+
+
+
+########################################################################### Unique Values
+
+@router.get("/fetch_unique_values", status_code=200)
+async def fetch_unique_values(
+        db: Annotated[AsyncSession, Depends(get_db)],
+        tables: Optional[str] = Query(None,
+                                      description="Comma-separated table names to fetch (e.g., 'areas,locations,uoms')")
+):
+    try:
+        repo = FetchUniqueValues(db)
+
+        # Parse tables parameter if provided
+        table_list = None
+        if tables:
+            table_list = [t.strip() for t in tables.split(",")]
+
+        result = await repo.fetch_unique_values(tables=table_list)
+        return {
+            "message": "Unique values fetched successfully",
+            "data": result
+        }
+    except HTTPException as ex:
+        raise ex
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
         )
