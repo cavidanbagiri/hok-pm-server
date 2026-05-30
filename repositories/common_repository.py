@@ -1,5 +1,4 @@
 from typing import Optional, List, Dict, Any
-
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 
@@ -2291,14 +2290,22 @@ class FetchStockRepository:
             alternative_id: Optional[str] = None,
             old_code: Optional[str] = None,
             comment: Optional[str] = None,
+            thickness_1: Optional[str] = None,
+            thickness_2: Optional[str] = None,
             type_id: Optional[int] = None,
             uom_id: Optional[int] = None,
-            # Name filters for relationships
+
             type_name: Optional[str] = None,
+            subtype_name: Optional[str] = None,
+            size1_name: Optional[str] = None,
+            size2_name: Optional[str] = None,
+            material_name: Optional[str] = None,
+            description_name: Optional[str] = None,
             uom_name: Optional[str] = None,
-            # Pagination
+
             page: int = 1,
             limit: int = 50
+
     ):
 
         # Build base query with eager loading for ALL nested relationships
@@ -2311,6 +2318,70 @@ class FetchStockRepository:
             selectinload(StockDataModel.item_type).selectinload(TypeModel.description),  # Load description.name
             selectinload(StockDataModel.uom)  # Load uom.name
         )
+
+        needs_type_join = any([
+            type_name,
+            subtype_name,
+            size1_name,
+            size2_name,
+            material_name,
+            description_name,
+            thickness_1,
+            thickness_2
+        ])
+
+        if needs_type_join:
+
+            query = (
+                query
+                .join(StockDataModel.item_type)
+                .join(TypeModel.type)
+                .join(TypeModel.subtype)
+                .join(TypeModel.size1)
+                .outerjoin(TypeModel.size2)
+                .join(TypeModel.material)
+                .join(TypeModel.description)
+            )
+
+            if thickness_1:
+                query = query.where(
+                    TypeModel.thickness_1 == thickness_1
+                )
+
+            if thickness_2:
+                query = query.where(
+                    TypeModel.thickness_2 == thickness_2
+                )
+
+            if type_name:
+                query = query.where(
+                    TypesModel.name == type_name
+                )
+
+            if subtype_name:
+                query = query.where(
+                    SubTypeModel.name == subtype_name
+                )
+
+            if size1_name:
+                query = query.where(
+                    Size1Model.name == size1_name
+                )
+
+            if size2_name:
+                query = query.where(
+                    Size2Model.name == size2_name
+                )
+
+            if material_name:
+                query = query.where(
+                    MaterialModel.name == material_name
+                )
+
+            if description_name:
+                query = query.where(
+                    DescriptionModel.name == description_name
+                )
 
         # Apply ID filters
         if stock_id is not None:
@@ -2335,11 +2406,11 @@ class FetchStockRepository:
         if comment is not None:
             query = query.where(StockDataModel.comment.ilike(f"%{comment}%"))
 
-        # Apply relationship name filters
-        if type_name is not None:
-            query = query.join(StockDataModel.item_type).join(TypeModel.type).where(
-                TypesModel.name.ilike(f"%{type_name}%")
-            )
+        # # Apply relationship name filters
+        # if type_name is not None:
+        #     query = query.join(StockDataModel.item_type).join(TypeModel.type).where(
+        #         TypesModel.name.ilike(f"%{type_name}%")
+        #     )
 
         if uom_name is not None:
             query = query.join(StockDataModel.uom).where(
@@ -2362,7 +2433,6 @@ class FetchStockRepository:
         stocks = result.scalars().all()
 
         return stocks, total_count
-
 
 class CreateStockRepository:
 
@@ -2410,7 +2480,6 @@ class CreateStockRepository:
         await self.db_session.refresh(stock)
 
         return stock
-
 
 class UpdateStockRepository:
 
@@ -2592,167 +2661,471 @@ class FetchUniqueValues:
     def __init__(self, db_session: AsyncSession):
         self.db = db_session
 
+    # =====================================================
+    # PUBLIC
+    # =====================================================
+
     async def fetch_unique_values(
-            self,
-            tables: Optional[List[str]] = None  # Optional: specify which tables to fetch
-    ) -> Dict[str, Any]:
+        self,
+        tables: Optional[List[str]] = None,
+        filters: Optional[Dict[str, Any]] = None
+    ):
+
+        filters = filters or {}
+
+        handlers = {
+            "areas": lambda: self._get_areas(),
+            "locations": lambda: self._get_locations(),
+            "uoms": lambda: self._get_uoms(filters),
+            "item_types": lambda: self._get_item_types(filters),
+            "subtypes": lambda: self._get_subtypes(filters),
+            "size1": lambda: self._get_size1(filters),
+            "size2": lambda: self._get_size2(filters),
+            "materials": lambda: self._get_materials(filters),
+            "descriptions": lambda: self._get_descriptions(filters),
+            "thickness": lambda: self._get_thickness(filters),
+            "stock_codes": lambda: self._get_stock_codes(filters),
+            "project_ids": lambda: self._get_project_ids(),
+        }
 
         result = {}
 
-        # Define all available queries
-        queries = {
-            "areas": self._get_areas,
-            "locations": self._get_locations,
-            "uoms": self._get_uoms,
-            "subtypes": self._get_subtypes,
-            "size1": self._get_size1,
-            "size2": self._get_size2,
-            "materials": self._get_materials,
-            "descriptions": self._get_descriptions,
-            "item_types": self._get_item_types,
-            "stock_codes": self._get_stock_codes,
-            "thickness": self._get_thickness,
-            "project_ids": self._get_project_ids
-        }
-
-        # If specific tables requested, only fetch those
         if tables:
             for table in tables:
-                if table in queries:
-                    result[table] = await queries[table]()
+                if table in handlers:
+                    result[table] = await handlers[table]()
         else:
-            # Fetch all tables
-            for key, query_func in queries.items():
-                result[key] = await query_func()
+            for key, handler in handlers.items():
+                result[key] = await handler()
 
         return result
 
-    async def _get_areas(self) -> List[Dict]:
-        query = select(
-            AreaModel.id,
-            AreaModel.name,
-            AreaModel.description,
-            AreaModel.project_id
-        ).order_by(AreaModel.name)
-        result = await self.db.execute(query)
-        areas = result.all()
-        return [
-            {
-                "id": area.id,
-                "name": area.name,
-                "description": area.description,
-                "project_id": area.project_id
-            }
-            for area in areas
-        ]
+    # =====================================================
+    # COMMON TYPE QUERY
+    # =====================================================
 
-    async def _get_locations(self) -> List[Dict]:
-        query = select(
-            LocationModel.id,
-            LocationModel.name,
-            LocationModel.project_id
-        ).order_by(LocationModel.name)
-        result = await self.db.execute(query)
-        locations = result.all()
-        return [
-            {
-                "id": loc.id,
-                "name": loc.name,
-                "project_id": loc.project_id
-            }
-            for loc in locations
-        ]
+    def _base_type_query(self):
 
-    async def _get_uoms(self) -> List[Dict]:
-        query = select(UomModel.id, UomModel.name).order_by(UomModel.name)
-        result = await self.db.execute(query)
-        uoms = result.all()
-        return [{"id": uom.id, "name": uom.name} for uom in uoms]
-
-    async def _get_subtypes(self) -> List[Dict]:
-        query = select(SubTypeModel.id, SubTypeModel.name).order_by(SubTypeModel.name)
-        result = await self.db.execute(query)
-        subtypes = result.all()
-        return [{"id": sub.id, "name": sub.name} for sub in subtypes]
-
-    async def _get_size1(self) -> List[Dict]:
-        query = select(Size1Model.id, Size1Model.name).order_by(Size1Model.name)
-        result = await self.db.execute(query)
-        size1_list = result.all()
-        return [{"id": size.id, "name": size.name} for size in size1_list]
-
-    async def _get_size2(self) -> List[Dict]:
-        query = select(Size2Model.id, Size2Model.name).order_by(Size2Model.name)
-        result = await self.db.execute(query)
-        size2_list = result.all()
-        return [{"id": size.id, "name": size.name} for size in size2_list]
-
-    async def _get_materials(self) -> List[Dict]:
-        query = select(MaterialModel.id, MaterialModel.name).order_by(MaterialModel.name)
-        result = await self.db.execute(query)
-        materials = result.all()
-        return [{"id": mat.id, "name": mat.name} for mat in materials]
-
-    async def _get_descriptions(self) -> List[Dict]:
-        query = select(DescriptionModel.id, DescriptionModel.name).order_by(DescriptionModel.name)
-        result = await self.db.execute(query)
-        descriptions = result.all()
-        return [{"id": desc.id, "name": desc.name} for desc in descriptions]
-
-    async def _get_item_types(self) -> List[Dict]:
-        query = select(TypesModel.id, TypesModel.name).order_by(TypesModel.name)
-        result = await self.db.execute(query)
-        item_types = result.all()
-        return [{"id": it.id, "name": it.name} for it in item_types]
-
-    async def _get_stock_codes(self) -> List[Dict]:
-        query = select(
-            StockDataModel.id,
-            StockDataModel.stock_code,
-            StockDataModel.alternative_id,
-            StockDataModel.old_code,
-            StockDataModel.comment
-        ).order_by(StockDataModel.stock_code)
-        result = await self.db.execute(query)
-        stock_codes = result.all()
-        return [
-            {
-                "id": stock.id,
-                "stock_code": stock.stock_code,
-                "alternative_id": stock.alternative_id,
-                "old_code": stock.old_code,
-                "comment": stock.comment
-            }
-            for stock in stock_codes
-        ]
-
-    async def _get_thickness(self) -> List[str]:
-        # Get unique thickness values from TypeModel
-        thickness_1_query = select(distinct(TypeModel.thickness_1)).where(
-            TypeModel.thickness_1.isnot(None),
-            TypeModel.thickness_1 != ""
+        return (
+            select()
+            .select_from(TypeModel)
+            .join(
+                TypesModel,
+                TypesModel.id == TypeModel.type_id
+            )
+            .join(
+                SubTypeModel,
+                SubTypeModel.id == TypeModel.subtype_id
+            )
+            .join(
+                Size1Model,
+                Size1Model.id == TypeModel.size1_id
+            )
+            .outerjoin(
+                Size2Model,
+                Size2Model.id == TypeModel.size2_id
+            )
+            .join(
+                MaterialModel,
+                MaterialModel.id == TypeModel.material_id
+            )
+            .join(
+                DescriptionModel,
+                DescriptionModel.id == TypeModel.description_id
+            )
         )
-        thickness_1_result = await self.db.execute(thickness_1_query)
-        thickness_1_values = [t[0] for t in thickness_1_result.all() if t[0]]
 
-        thickness_2_query = select(distinct(TypeModel.thickness_2)).where(
-            TypeModel.thickness_2.isnot(None),
-            TypeModel.thickness_2 != ""
+    def _apply_filters(self, query, filters):
+
+        if filters.get("type_name"):
+            query = query.where(
+                TypesModel.name == filters["type_name"]
+            )
+
+        if filters.get("subtype_name"):
+            query = query.where(
+                SubTypeModel.name == filters["subtype_name"]
+            )
+
+        if filters.get("size1_name"):
+            query = query.where(
+                Size1Model.name == filters["size1_name"]
+            )
+
+        if filters.get("size2_name"):
+            query = query.where(
+                Size2Model.name == filters["size2_name"]
+            )
+
+        if filters.get("material_name"):
+            query = query.where(
+                MaterialModel.name == filters["material_name"]
+            )
+
+        if filters.get("description_name"):
+            query = query.where(
+                DescriptionModel.name == filters["description_name"]
+            )
+
+        if filters.get("thickness_1"):
+            query = query.where(
+                TypeModel.thickness_1 == filters["thickness_1"]
+            )
+
+        if filters.get("thickness_2"):
+            query = query.where(
+                TypeModel.thickness_2 == filters["thickness_2"]
+            )
+
+        return query
+
+    # =====================================================
+    # AREAS
+    # =====================================================
+
+    async def _get_areas(self):
+
+        query = (
+            select(
+                AreaModel.id,
+                AreaModel.name,
+                AreaModel.description,
+                AreaModel.project_id
+            )
+            .order_by(AreaModel.name)
         )
-        thickness_2_result = await self.db.execute(thickness_2_query)
-        thickness_2_values = [t[0] for t in thickness_2_result.all() if t[0]]
 
-        # Combine and sort unique values
-        all_thickness = sorted(list(set(thickness_1_values + thickness_2_values)))
-        return all_thickness
-
-    async def _get_project_ids(self) -> List[int]:
-        query = select(distinct(AreaModel.project_id)).union(
-            select(distinct(LocationModel.project_id))
-        ).order_by(AreaModel.project_id)
         result = await self.db.execute(query)
-        project_ids = [p[0] for p in result.all() if p[0]]
-        return project_ids
+
+        return [
+            {
+                "id": row.id,
+                "name": row.name,
+                "description": row.description,
+                "project_id": row.project_id
+            }
+            for row in result.all()
+        ]
+
+    # =====================================================
+    # LOCATIONS
+    # =====================================================
+
+    async def _get_locations(self):
+
+        query = (
+            select(
+                LocationModel.id,
+                LocationModel.name,
+                LocationModel.project_id
+            )
+            .order_by(LocationModel.name)
+        )
+
+        result = await self.db.execute(query)
+
+        return [
+            {
+                "id": row.id,
+                "name": row.name,
+                "project_id": row.project_id
+            }
+            for row in result.all()
+        ]
+
+    # =====================================================
+    # UOMS
+    # =====================================================
+
+    async def _get_uoms(self, filters):
+
+        query = select(
+            UomModel.id,
+            UomModel.name
+        )
+
+        if filters.get("uom_name"):
+            query = query.where(
+                UomModel.name.ilike(
+                    f"%{filters['uom_name']}%"
+                )
+            )
+
+        query = query.order_by(UomModel.name)
+
+        result = await self.db.execute(query)
+
+        return [
+            {
+                "id": row.id,
+                "name": row.name
+            }
+            for row in result.all()
+        ]
+
+    # =====================================================
+    # ITEM TYPES
+    # =====================================================
+
+    async def _get_item_types(self, filters):
+
+        query = (
+            self._base_type_query()
+            .with_only_columns(
+                TypesModel.id,
+                TypesModel.name
+            )
+        )
+
+        query = self._apply_filters(query, filters)
+
+        query = query.distinct().order_by(
+            TypesModel.name
+        )
+
+        result = await self.db.execute(query)
+
+        return [
+            {"id": row.id, "name": row.name}
+            for row in result.all()
+        ]
+
+    # =====================================================
+    # SUBTYPES
+    # =====================================================
+
+    async def _get_subtypes(self, filters):
+
+        query = (
+            self._base_type_query()
+            .with_only_columns(
+                SubTypeModel.id,
+                SubTypeModel.name
+            )
+        )
+
+        query = self._apply_filters(query, filters)
+
+        query = query.distinct().order_by(
+            SubTypeModel.name
+        )
+
+        result = await self.db.execute(query)
+
+        return [
+            {"id": row.id, "name": row.name}
+            for row in result.all()
+        ]
+
+    # =====================================================
+    # SIZE1
+    # =====================================================
+
+    async def _get_size1(self, filters):
+
+        query = (
+            self._base_type_query()
+            .with_only_columns(
+                Size1Model.id,
+                Size1Model.name
+            )
+        )
+
+        query = self._apply_filters(query, filters)
+
+        query = query.distinct().order_by(
+            Size1Model.name
+        )
+
+        result = await self.db.execute(query)
+
+        return [
+            {"id": row.id, "name": row.name}
+            for row in result.all()
+        ]
+
+    # =====================================================
+    # SIZE2
+    # =====================================================
+
+    async def _get_size2(self, filters):
+
+        query = (
+            self._base_type_query()
+            .with_only_columns(
+                Size2Model.id,
+                Size2Model.name
+            )
+        )
+
+        query = self._apply_filters(query, filters)
+
+        query = query.distinct().order_by(
+            Size2Model.name
+        )
+
+        result = await self.db.execute(query)
+
+        return [
+            {"id": row.id, "name": row.name}
+            for row in result.all()
+        ]
+
+    # =====================================================
+    # MATERIALS
+    # =====================================================
+
+    async def _get_materials(self, filters):
+
+        query = (
+            self._base_type_query()
+            .with_only_columns(
+                MaterialModel.id,
+                MaterialModel.name
+            )
+        )
+
+        query = self._apply_filters(query, filters)
+
+        query = query.distinct().order_by(
+            MaterialModel.name
+        )
+
+        result = await self.db.execute(query)
+
+        return [
+            {"id": row.id, "name": row.name}
+            for row in result.all()
+        ]
+
+    # =====================================================
+    # DESCRIPTIONS
+    # =====================================================
+
+    async def _get_descriptions(self, filters):
+
+        query = (
+            self._base_type_query()
+            .with_only_columns(
+                DescriptionModel.id,
+                DescriptionModel.name
+            )
+        )
+
+        query = self._apply_filters(query, filters)
+
+        query = query.distinct().order_by(
+            DescriptionModel.name
+        )
+
+        result = await self.db.execute(query)
+
+        return [
+            {"id": row.id, "name": row.name}
+            for row in result.all()
+        ]
+
+    # =====================================================
+    # THICKNESS
+    # =====================================================
+
+    async def _get_thickness(self, filters):
+
+        query = (
+            self._base_type_query()
+            .with_only_columns(
+                TypeModel.thickness_1,
+                TypeModel.thickness_2
+            )
+        )
+
+        query = self._apply_filters(query, filters)
+
+        result = await self.db.execute(query)
+
+        values = set()
+
+        for row in result.all():
+
+            if row.thickness_1 and row.thickness_1 != "-":
+                values.add(row.thickness_1)
+
+            if row.thickness_2 and row.thickness_2 != "-":
+                values.add(row.thickness_2)
+
+        return sorted(values)
+
+    # =====================================================
+    # STOCK CODES
+    # =====================================================
+
+    async def _get_stock_codes(self, filters):
+
+        query = (
+            self._base_type_query()
+            .join(
+                StockDataModel,
+                StockDataModel.type_id == TypeModel.id
+            )
+            .with_only_columns(
+                StockDataModel.id,
+                StockDataModel.stock_code,
+                StockDataModel.alternative_id,
+                StockDataModel.old_code,
+                StockDataModel.comment
+            )
+        )
+
+        query = self._apply_filters(query, filters)
+
+        if filters.get("stock_code"):
+            query = query.where(
+                StockDataModel.stock_code.ilike(
+                    f"%{filters['stock_code']}%"
+                )
+            )
+
+        query = query.order_by(
+            StockDataModel.stock_code
+        )
+
+        result = await self.db.execute(query)
+
+        return [
+            {
+                "id": row.id,
+                "stock_code": row.stock_code,
+                "alternative_id": row.alternative_id,
+                "old_code": row.old_code,
+                "comment": row.comment
+            }
+            for row in result.all()
+        ]
+
+    # =====================================================
+    # PROJECT IDS
+    # =====================================================
+
+    async def _get_project_ids(self):
+
+        query = (
+            select(
+                distinct(AreaModel.project_id)
+            )
+            .union(
+                select(
+                    distinct(LocationModel.project_id)
+                )
+            )
+        )
+
+        result = await self.db.execute(query)
+
+        return [
+            row[0]
+            for row in result.all()
+            if row[0]
+        ]
 
 
 

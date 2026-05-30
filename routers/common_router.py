@@ -96,7 +96,6 @@ async def update_area(
     except HTTPException as ex:
         raise ex
     except Exception as ex:
-        print(ex)
         raise HTTPException(
             status_code=500,
             detail="Internal server error"
@@ -934,33 +933,55 @@ async def update_type(
 async def fetch_stock_data(
         db: Annotated[AsyncSession, Depends(get_db)],
         # ID filters
+
         stock_id: Optional[int] = None,
         type_id: Optional[int] = None,
         uom_id: Optional[int] = None,
-        # String filters (case-insensitive partial match)
+
         stock_code: Optional[str] = None,
         alternative_id: Optional[str] = None,
         old_code: Optional[str] = None,
         comment: Optional[str] = None,
-        # Relationship name filters
+        thickness_1: Optional[str] = None,
+        thickness_2: Optional[str] = None,
+
         type_name: Optional[str] = None,
+        subtype_name: Optional[str] = None,
+        size1_name: Optional[str] = None,
+        size2_name: Optional[str] = None,
+        material_name: Optional[str] = None,
+        description_name: Optional[str] = None,
         uom_name: Optional[str] = None,
-        # Pagination
-        page: Optional[int] = Query(1, ge=1, description="Page number"),
-        limit: Optional[int] = Query(50, ge=1, le=200, description="Items per page (max 200)")
+
+        page: int = Query(1, ge=1),
+        limit: int = Query(50, ge=1, le=200)
+
 ):
     try:
         repo = FetchStockRepository(db)
+
+
         result, total_count = await repo.fetch_stock(
             stock_id=stock_id,
             stock_code=stock_code,
             alternative_id=alternative_id,
             old_code=old_code,
             comment=comment,
+
+            thickness_1=thickness_1,
+            thickness_2=thickness_2,
+
             type_id=type_id,
             uom_id=uom_id,
+
             type_name=type_name,
+            subtype_name=subtype_name,
+            size1_name=size1_name,
+            size2_name=size2_name,
+            material_name=material_name,
+            description_name=description_name,
             uom_name=uom_name,
+
             page=page,
             limit=limit
         )
@@ -1031,32 +1052,6 @@ async def update_stock_data(
         )
 
 
-# @router.patch("/update_stock_data/{stock_id}", status_code=200)
-# async def update_stock_data_partial(
-#         stock_id: int,
-#         data: UpdateStockSchema,
-#         db: Annotated[AsyncSession, Depends(get_db)],
-#         user_info: dict = Depends(TokenHandler.verify_access_token)
-# ):
-#     try:
-#         user_id = user_info.get('sub')
-#         repo = UpdateStockRepository(db, data, int(user_id), stock_id)
-#         result = await repo.update_stock()
-#
-#         return {
-#             "message": "Stock data updated successfully",
-#             "data": result
-#         }
-#     except HTTPException as ex:
-#         raise ex
-#     except Exception:
-#         raise HTTPException(
-#             status_code=500,
-#             detail="Internal server error"
-#         )
-
-
-
 ########################################################################### Project Functions
 
 @router.get("/fetch_projects", status_code=200)
@@ -1085,11 +1080,23 @@ async def fetch_projects(
 
 ########################################################################### Unique Values
 
+
 @router.get("/fetch_unique_values", status_code=200)
 async def fetch_unique_values(
         db: Annotated[AsyncSession, Depends(get_db)],
-        tables: Optional[str] = Query(None,
-                                      description="Comma-separated table names to fetch (e.g., 'areas,locations,uoms')")
+        tables: Optional[str] = Query(None, description="Comma-separated table names to fetch"),
+        # Type filters for cascading
+        type_name: Optional[str] = Query(None, description="Filter by type name"),
+        subtype_name: Optional[str] = Query(None, description="Filter by subtype name"),
+        size1_name: Optional[str] = Query(None, description="Filter by size1 name"),
+        size2_name: Optional[str] = Query(None, description="Filter by size2 name"),
+        material_name: Optional[str] = Query(None, description="Filter by material name"),
+        description_name: Optional[str] = Query(None, description="Filter by description name"),
+        thickness_1: Optional[str] = Query(None, description="Filter by thickness 1"),
+        thickness_2: Optional[str] = Query(None, description="Filter by thickness 2"),
+        # Stock filters
+        stock_code: Optional[str] = Query(None, description="Filter by stock code"),
+        uom_name: Optional[str] = Query(None, description="Filter by UOM name")
 ):
     try:
         repo = FetchUniqueValues(db)
@@ -1099,7 +1106,25 @@ async def fetch_unique_values(
         if tables:
             table_list = [t.strip() for t in tables.split(",")]
 
-        result = await repo.fetch_unique_values(tables=table_list)
+        # Build filter context
+        filters = {
+            "type_name": type_name,
+            "subtype_name": subtype_name,
+            "size1_name": size1_name,
+            "size2_name": size2_name,
+            "material_name": material_name,
+            "description_name": description_name,
+            "thickness_1": thickness_1,
+            "thickness_2": thickness_2,
+            "stock_code": stock_code,
+            "uom_name": uom_name
+        }
+
+        result = await repo.fetch_unique_values(
+            tables=table_list,
+            filters=filters
+        )
+
         return {
             "message": "Unique values fetched successfully",
             "data": result
@@ -1111,6 +1136,35 @@ async def fetch_unique_values(
             status_code=500,
             detail=f"Internal server error: {str(e)}"
         )
+
+
+
+# @router.get("/fetch_unique_values", status_code=200)
+# async def fetch_unique_values(
+#         db: Annotated[AsyncSession, Depends(get_db)],
+#         tables: Optional[str] = Query(None,
+#                                       description="Comma-separated table names to fetch (e.g., 'areas,locations,uoms')")
+# ):
+#     try:
+#         repo = FetchUniqueValues(db)
+#
+#         # Parse tables parameter if provided
+#         table_list = None
+#         if tables:
+#             table_list = [t.strip() for t in tables.split(",")]
+#
+#         result = await repo.fetch_unique_values(tables=table_list)
+#         return {
+#             "message": "Unique values fetched successfully",
+#             "data": result
+#         }
+#     except HTTPException as ex:
+#         raise ex
+#     except Exception as e:
+#         raise HTTPException(
+#             status_code=500,
+#             detail=f"Internal server error: {str(e)}"
+#         )
 
 
 
