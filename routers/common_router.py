@@ -1031,29 +1031,29 @@ async def update_stock_data(
         )
 
 
-@router.patch("/update_stock_data/{stock_id}", status_code=200)
-async def update_stock_data_partial(
-        stock_id: int,
-        data: UpdateStockSchema,
-        db: Annotated[AsyncSession, Depends(get_db)],
-        user_info: dict = Depends(TokenHandler.verify_access_token)
-):
-    try:
-        user_id = user_info.get('sub')
-        repo = UpdateStockRepository(db, data, int(user_id), stock_id)
-        result = await repo.update_stock()
-
-        return {
-            "message": "Stock data updated successfully",
-            "data": result
-        }
-    except HTTPException as ex:
-        raise ex
-    except Exception:
-        raise HTTPException(
-            status_code=500,
-            detail="Internal server error"
-        )
+# @router.patch("/update_stock_data/{stock_id}", status_code=200)
+# async def update_stock_data_partial(
+#         stock_id: int,
+#         data: UpdateStockSchema,
+#         db: Annotated[AsyncSession, Depends(get_db)],
+#         user_info: dict = Depends(TokenHandler.verify_access_token)
+# ):
+#     try:
+#         user_id = user_info.get('sub')
+#         repo = UpdateStockRepository(db, data, int(user_id), stock_id)
+#         result = await repo.update_stock()
+#
+#         return {
+#             "message": "Stock data updated successfully",
+#             "data": result
+#         }
+#     except HTTPException as ex:
+#         raise ex
+#     except Exception:
+#         raise HTTPException(
+#             status_code=500,
+#             detail="Internal server error"
+#         )
 
 
 
@@ -1104,6 +1104,26 @@ async def fetch_unique_values(
             "message": "Unique values fetched successfully",
             "data": result
         }
+    except HTTPException as ex:
+        raise ex
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+
+
+########################################################################### Types without stock_code
+@router.get("/fetch_types_without_stock", status_code=200)
+async def fetch_types_without_stock(
+        db: Annotated[AsyncSession, Depends(get_db)]
+):
+    try:
+        repo = FetchTypesWithoutStockCode(db)
+        result = await repo.fetch_types_without_stock()
+        return result
+
     except HTTPException as ex:
         raise ex
     except Exception as e:

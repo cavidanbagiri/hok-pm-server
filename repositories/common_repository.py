@@ -2755,3 +2755,95 @@ class FetchUniqueValues:
         return project_ids
 
 
+
+########################################################################### Types without stock_code
+class FetchTypesWithoutStockCode:
+
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def fetch_types_without_stock(self) -> Dict[str, Any]:
+        """
+        Fetch all TypeModel records that are NOT referenced in any StockDataModel
+        """
+
+        # Subquery to get all type_id values that exist in stock_data
+        stock_type_ids_subquery = (
+            select(StockDataModel.type_id)
+            .distinct()
+            .where(StockDataModel.type_id.isnot(None))
+            .subquery()
+        )
+
+        # Main query: Get all TypeModel records where id is NOT in the subquery
+        query = (
+            select(TypeModel)
+            .where(
+                TypeModel.id.notin_(select(stock_type_ids_subquery))
+            )
+            .options(
+                selectinload(TypeModel.type),
+                selectinload(TypeModel.subtype),
+                selectinload(TypeModel.size1),
+                selectinload(TypeModel.size2),
+                selectinload(TypeModel.material),
+                selectinload(TypeModel.description)
+            )
+            .order_by(TypeModel.id)
+        )
+
+        # Execute query
+        result = await self.db.execute(query)
+        types_without_stock = result.scalars().all()
+
+        # Format the response
+        formatted_results = []
+        for type_obj in types_without_stock:
+            formatted_results.append({
+                "id": type_obj.id,
+                "type_id": type_obj.type_id,
+                "type_name": type_obj.type.name if type_obj.type else None,
+                "subtype_id": type_obj.subtype_id,
+                "subtype_name": type_obj.subtype.name if type_obj.subtype else None,
+                "size1_id": type_obj.size1_id,
+                "size1_name": type_obj.size1.name if type_obj.size1 else None,
+                "size2_id": type_obj.size2_id,
+                "size2_name": type_obj.size2.name if type_obj.size2 else None,
+                "material_id": type_obj.material_id,
+                "material_name": type_obj.material.name if type_obj.material else None,
+                "description_id": type_obj.description_id,
+                "description_name": type_obj.description.name if type_obj.description else None,
+                "thickness_1": type_obj.thickness_1,
+                "thickness_2": type_obj.thickness_2,
+                # Full relationship objects (optional)
+                "type": {
+                    "id": type_obj.type.id,
+                    "name": type_obj.type.name
+                } if type_obj.type else None,
+                "subtype": {
+                    "id": type_obj.subtype.id,
+                    "name": type_obj.subtype.name
+                } if type_obj.subtype else None,
+                "size1": {
+                    "id": type_obj.size1.id,
+                    "name": type_obj.size1.name
+                } if type_obj.size1 else None,
+                "size2": {
+                    "id": type_obj.size2.id,
+                    "name": type_obj.size2.name
+                } if type_obj.size2 else None,
+                "material": {
+                    "id": type_obj.material.id,
+                    "name": type_obj.material.name
+                } if type_obj.material else None,
+                "description": {
+                    "id": type_obj.description.id,
+                    "name": type_obj.description.name
+                } if type_obj.description else None,
+            })
+
+        return {
+            "message": "Types without stock code fetched successfully",
+            "count": len(formatted_results),
+            "data": formatted_results
+        }
