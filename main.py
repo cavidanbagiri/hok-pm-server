@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import auth_router, admin_router, common_router, static_data_router
+from routers import auth_router, admin_router, common_router, static_data_router, mto_router
 
 app = FastAPI()
 
@@ -30,4 +30,5 @@ app.add_middleware(
 app.include_router(router = auth_router.router, prefix="/api/auth", tags=["User"])
 app.include_router(router = admin_router.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(router = common_router.router, prefix="/api/common", tags=["Common"])
+app.include_router(router = mto_router.router, prefix="/api/mto", tags=["MTO"])
 app.include_router(router = static_data_router.router, prefix="/api/static", tags=["Static"])
